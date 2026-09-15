@@ -1,6 +1,6 @@
 # 当前部署
 
-最近部署日期：2026-09-15。界面提交 `2ccfb6e`，重新设计个人设置；保留此前 `dc93890` 的消息操作、附件／头像、外观设置、Turnstile 与反垃圾配置、管理员聊天记录查询。首次部署使用独立数据目录，未上传本机的用户和聊天数据。
+最近部署日期：2026-09-15。修复提交 `b3aa32a`，发送消息后输入框继续保持焦点；界面提交 `2ccfb6e` 重新设计个人设置。首次部署使用独立数据目录，未上传本机的用户和聊天数据。
 
 | 项目 | 当前值 |
 | --- | --- |
@@ -13,9 +13,9 @@
 | 环境配置 | `/etc/obsidianchat/server.env`，仅 root 可读 |
 | 数据目录 | `/data/obsidianchat`，运行账号独占 |
 | 程序入口 | `/opt/obsidianchat/current/obsidianchat` |
-| 当前版本目录 | `/opt/obsidianchat/releases/20260915150800` |
+| 当前版本目录 | `/opt/obsidianchat/releases/20260915153237` |
 | Linux 程序大小 | 12,132,512 B |
-| 程序 SHA256 | `1521ff7a02a595d13de9b03c8d5ff76c9335455804ed436f937f8681a94f47b6` |
+| 程序 SHA256 | `a16a33bbcc93f071d53b8017e7747c379308155924feb57da5f4a39281cf3961` |
 | 防火墙 | 已撤销 TCP 8090 公网规则；应用仅监听回环地址 |
 | 启动策略 | 开机启动，失败后 2 秒重启 |
 | 资源边界 | Go 软内存限制 192 MiB，systemd MemoryHigh 256 MiB / MemoryMax 512 MiB，文件描述符 65,536 |
@@ -25,6 +25,12 @@
 仅当 `X-Forwarded-Proto: http` 时跳转到浏览器 HTTPS 地址；Cloudflare 传来的 HTTPS 访问经 HTTP 回源后直接提供内容，避免自重定向。反向代理立即刷新流式输出。此次变更的备份：`/etc/caddy/Caddyfile.before-chat-flexible-20260910100741` 和 `/etc/obsidianchat/server.env.before-flexible-20260910100741`。
 
 ## 验证结果
+
+### 2026-09-15 连续输入修复
+
+- 发送完成并解除输入框禁用后重新聚焦，用户可直接继续打字；发送失败时也保留输入焦点和原内容。
+- 11 项前端测试、类型检查和生产构建通过；公网首页与健康检查为 200，服务为 active。
+- 更新前数据备份：`/opt/obsidianchat/backups/before-20260915153237.tar.gz`；无数据库变更。
 
 ### 2026-09-15 设置界面重设计
 
