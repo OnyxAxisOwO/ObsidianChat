@@ -923,6 +923,74 @@ strong {
   border-radius: 14px;
   padding: 20px;
 }
+.notification-setting {
+  padding: 15px;
+  gap: 16px;
+}
+.notification-setting strong {
+  font-size: 14px;
+}
+.notification-setting p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.notification-prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(5px);
+}
+.notification-prompt {
+  width: min(400px, 100%);
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+}
+.notification-prompt-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  color: var(--on-primary);
+  background: var(--primary);
+}
+.notification-prompt h2 {
+  margin-bottom: 8px;
+  font-size: 19px;
+}
+.notification-prompt-choice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 20px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.notification-prompt-choice input {
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  accent-color: var(--primary);
+}
+.notification-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+.notification-prompt-actions button {
+  min-width: 76px;
+}
 .switch {
   width: 42px;
   height: 26px;

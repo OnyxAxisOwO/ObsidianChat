@@ -25,6 +25,7 @@ import {
   UserPlus,
   X,
   RefreshCw,
+  Bell,
 } from "lucide-vue-next";
 import AuthForm from "./AuthForm.vue";
 import FriendPanel from "./FriendPanel.vue";
@@ -40,6 +41,10 @@ const {
   error,
   connected,
   canRead,
+  notificationSupported,
+  notificationPermission,
+  notificationEnabled,
+  notificationPromptVisible,
   rooms,
   friends,
   selected,
@@ -53,6 +58,8 @@ const {
   loadMessages,
   select,
   markRead,
+  setNotifications,
+  respondToNotificationPrompt,
   login,
   boot,
   logout,
@@ -69,6 +76,9 @@ const draft = ref(""),
   olderLoading = ref(false),
   mobileChat = ref(false),
   sendError = ref("");
+const notificationBusy = ref(false);
+const notificationPromptNever = ref(false),
+  notificationDialog = ref<HTMLElement>();
 const renderedPanel = ref("");
 const enteringMessages = shallowRef(new Set<number>());
 let panelTrigger: HTMLElement | null = null;
@@ -89,6 +99,34 @@ function restorePanelFocus() {
   if (!panel.value && panelTrigger?.isConnected)
     panelTrigger.focus({ preventScroll: true });
 }
+async function changeNotifications(enabled: boolean) {
+  notificationBusy.value = true;
+  try {
+    await setNotifications(enabled);
+  } catch (e) {
+    report(e);
+  } finally {
+    notificationBusy.value = false;
+  }
+}
+async function answerNotificationPrompt(enabled: boolean) {
+  notificationBusy.value = true;
+  try {
+    await respondToNotificationPrompt(enabled, notificationPromptNever.value);
+  } catch (e) {
+    report(e);
+  } finally {
+    notificationBusy.value = false;
+  }
+}
+watch(notificationPromptVisible, (visible) => {
+  if (visible)
+    nextTick(() =>
+      notificationDialog.value
+        ?.querySelector<HTMLElement>("button.primary")
+        ?.focus(),
+    );
+});
 watch(
   messages,
   (value, previous) => {
@@ -648,7 +686,12 @@ onMounted(boot);
                 v-else-if="renderedPanel === 'account'"
                 key="account"
                 :me="me"
+                :notifications-supported="notificationSupported"
+                :notifications-enabled="notificationEnabled"
+                :notification-permission="notificationPermission"
+                :notification-busy="notificationBusy"
                 @close="panel = ''"
+                @notifications="changeNotifications"
                 @updated="
                   (user) => {
                     me = user;
@@ -662,5 +705,46 @@ onMounted(boot);
         </Transition>
       </main>
     </Transition>
+    <div
+      v-if="me && notificationPromptVisible"
+      class="notification-prompt-backdrop"
+      @keydown.esc="answerNotificationPrompt(false)"
+    >
+      <section
+        ref="notificationDialog"
+        class="notification-prompt"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="notification-prompt-title"
+        aria-describedby="notification-prompt-description"
+      >
+        <span class="notification-prompt-icon"><Bell :size="22" /></span>
+        <h2 id="notification-prompt-title">是否打开新消息通知？</h2>
+        <p id="notification-prompt-description">
+          打开后，网站在后台收到新消息时会显示系统通知。
+        </p>
+        <label class="notification-prompt-choice">
+          <input v-model="notificationPromptNever" type="checkbox" />
+          <span>不再提醒</span>
+        </label>
+        <div class="notification-prompt-actions">
+          <button
+            type="button"
+            :disabled="notificationBusy"
+            @click="answerNotificationPrompt(false)"
+          >
+            否
+          </button>
+          <button
+            type="button"
+            class="primary"
+            :disabled="notificationBusy"
+            @click="answerNotificationPrompt(true)"
+          >
+            {{ notificationBusy ? "处理中…" : "是" }}
+          </button>
+        </div>
+      </section>
+    </div>
   </div>
 </template>

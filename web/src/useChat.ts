@@ -7,7 +7,19 @@ export function useChat() {
     loading = ref(true),
     error = ref(""),
     connected = ref(false),
-    canRead = ref(true);
+    canRead = ref(true),
+    notificationSupported = ref(typeof Notification !== "undefined"),
+    notificationPermission = ref<NotificationPermission | "unsupported">(
+      typeof Notification === "undefined"
+        ? "unsupported"
+        : Notification.permission,
+    ),
+    notificationEnabled = ref(
+      typeof Notification !== "undefined" &&
+        Notification.permission === "granted" &&
+        localStorage.getItem("oc-notifications") !== "false",
+    ),
+    notificationPromptVisible = ref(false);
   const rooms = ref<Room[]>([]),
     friends = ref<FriendData>({ friends: [], requests: [] }),
     selected = ref(""),
@@ -138,6 +150,69 @@ export function useChat() {
       }
     }, 400);
   }
+  async function setNotifications(enabled: boolean) {
+    if (typeof Notification === "undefined") return false;
+    notificationSupported.value = true;
+    let permission = Notification.permission;
+    if (enabled && permission === "default")
+      permission = await Notification.requestPermission();
+    notificationPermission.value = permission;
+    notificationEnabled.value = enabled && permission === "granted";
+    if (notificationEnabled.value)
+      localStorage.setItem("oc-notifications", "true");
+    else if (enabled) localStorage.removeItem("oc-notifications");
+    else localStorage.setItem("oc-notifications", "false");
+    return notificationEnabled.value;
+  }
+  function showNotificationPrompt() {
+    if (
+      typeof Notification === "undefined" ||
+      Notification.permission === "denied" ||
+      notificationEnabled.value ||
+      localStorage.getItem("oc-notification-reminder") === "never"
+    )
+      return;
+    notificationPromptVisible.value = true;
+  }
+  async function respondToNotificationPrompt(
+    enabled: boolean,
+    neverRemind: boolean,
+  ) {
+    notificationPromptVisible.value = false;
+    if (neverRemind)
+      localStorage.setItem("oc-notification-reminder", "never");
+    if (!enabled) return false;
+    return await setNotifications(true);
+  }
+  function notifyMessage(m: Message, room: Room) {
+    if (
+      !notificationEnabled.value ||
+      typeof Notification === "undefined" ||
+      Notification.permission !== "granted" ||
+      !document.hidden ||
+      m.sender === me.value?.id
+    )
+      return;
+    try {
+      const notification = new Notification(
+        room.kind === "group" ? `${m.name} · ${room.name}` : room.name,
+        {
+          body: m.body,
+          icon: "/favicon.svg",
+          tag: `room-${room.id}`,
+        },
+      );
+      notification.onclick = () => {
+        window.focus();
+        void select(room.id);
+        notification.close();
+      };
+    } catch {
+      notificationEnabled.value = false;
+      notificationPermission.value = Notification.permission;
+      localStorage.removeItem("oc-notifications");
+    }
+  }
   function receive(m: Message) {
     const room = rooms.value.find((r) => r.id === m.room_id);
     if (!room) {
@@ -151,6 +226,7 @@ export function useChat() {
       room.last_message = m.body;
       if (m.sender !== me.value?.id) room.unread++;
       rooms.value.sort((a, b) => b.last_at - a.last_at);
+      notifyMessage(m, room);
     }
     if (selected.value === m.room_id && !browsingHistory.value) {
       if (!messages.value.some((v) => v.id === m.id))
@@ -215,6 +291,7 @@ export function useChat() {
     refreshing = undefined;
     me.value = user;
     error.value = "";
+    showNotificationPrompt();
     try {
       await refresh();
       connect();
@@ -264,6 +341,10 @@ export function useChat() {
     error,
     connected,
     canRead,
+    notificationSupported,
+    notificationPermission,
+    notificationEnabled,
+    notificationPromptVisible,
     rooms,
     friends,
     selected,
@@ -277,6 +358,8 @@ export function useChat() {
     loadMessages,
     select,
     markRead,
+    setNotifications,
+    respondToNotificationPrompt,
     login,
     boot,
     logout,

@@ -109,6 +109,85 @@ describe("chat state", () => {
     await vi.advanceTimersByTimeAsync(450);
     expect(chat.rooms.value[0]!.unread).toBe(0);
   });
+  it("shows one system notification for a new message while hidden", async () => {
+    const shown: BrowserNotification[] = [];
+    class BrowserNotification {
+      static permission: NotificationPermission = "granted";
+      static requestPermission = vi.fn(async () => "granted" as const);
+      onclick: (() => void) | null = null;
+      close = vi.fn();
+      constructor(
+        public title: string,
+        public options?: NotificationOptions,
+      ) {
+        shown.push(this);
+      }
+    }
+    vi.stubGlobal("Notification", BrowserNotification);
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(() => "true"),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+    vi.stubGlobal("document", {
+      hidden: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    const chat = useChat();
+    await chat.login(me);
+    Stream.latest.emit({ type: "message", message: message(1) });
+    Stream.latest.emit({ type: "message", message: message(1) });
+    expect(shown).toHaveLength(1);
+    expect(shown[0]!.title).toBe("Other · a");
+    expect(shown[0]!.options?.body).toBe("message");
+  });
+  it("asks in-app before requesting browser permission", async () => {
+    class BrowserNotification {
+      static permission: NotificationPermission = "default";
+      static requestPermission = vi.fn(async () => {
+        BrowserNotification.permission = "granted";
+        return "granted" as const;
+      });
+    }
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    vi.stubGlobal("Notification", BrowserNotification);
+    vi.stubGlobal("localStorage", storage);
+    const chat = useChat();
+    await chat.login(me);
+    expect(chat.notificationPromptVisible.value).toBe(true);
+    expect(BrowserNotification.requestPermission).not.toHaveBeenCalled();
+    await chat.respondToNotificationPrompt(true, false);
+    expect(chat.notificationEnabled.value).toBe(true);
+    expect(chat.notificationPromptVisible.value).toBe(false);
+    expect(BrowserNotification.requestPermission).toHaveBeenCalledOnce();
+    expect(storage.setItem).toHaveBeenCalledWith("oc-notifications", "true");
+  });
+  it("remembers when the in-app notification prompt is disabled", async () => {
+    class BrowserNotification {
+      static permission: NotificationPermission = "default";
+      static requestPermission = vi.fn(async () => "granted" as const);
+    }
+    const values = new Map<string, string>();
+    vi.stubGlobal("Notification", BrowserNotification);
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem: vi.fn(),
+    });
+    const chat = useChat();
+    await chat.login(me);
+    await chat.respondToNotificationPrompt(false, true);
+    expect(values.get("oc-notification-reminder")).toBe("never");
+    expect(BrowserNotification.requestPermission).not.toHaveBeenCalled();
+    const reopened = useChat();
+    await reopened.login(me);
+    expect(reopened.notificationPromptVisible.value).toBe(false);
+  });
   it("keeps historical browsing stable while new messages arrive", async () => {
     const chat = useChat();
     await chat.login(me);
