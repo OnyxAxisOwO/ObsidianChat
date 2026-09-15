@@ -1,6 +1,6 @@
 # 当前部署
 
-最近部署日期：2026-09-15。界面提交 `df81d90` 增加马卡龙背景、Material You 风格动态控件色和可调联系人栏。首次部署使用独立数据目录，未上传本机的用户和聊天数据。
+最近部署日期：2026-09-15。修复提交 `46aa4f3` 将右侧详情／设置栏和管理员导航栏纳入可调分栏。首次部署使用独立数据目录，未上传本机的用户和聊天数据。
 
 | 项目 | 当前值 |
 | --- | --- |
@@ -13,9 +13,9 @@
 | 环境配置 | `/etc/obsidianchat/server.env`，仅 root 可读 |
 | 数据目录 | `/data/obsidianchat`，运行账号独占 |
 | 程序入口 | `/opt/obsidianchat/current/obsidianchat` |
-| 当前版本目录 | `/opt/obsidianchat/releases/20260915183402` |
-| Linux 程序大小 | 12,140,704 B |
-| 程序 SHA256 | `291e83d98ee9f8949f9a7dd6e3b8bd0b42f882f60642a1585823eeb63e77a9e2` |
+| 当前版本目录 | `/opt/obsidianchat/releases/20260915185622` |
+| Linux 程序大小 | 12,144,800 B |
+| 程序 SHA256 | `e65f9fdadc54db508cc6bebc965f6d5c4f92daf482e13f12dd4beaaf116021df` |
 | 防火墙 | 已撤销 TCP 8090 公网规则；应用仅监听回环地址 |
 | 启动策略 | 开机启动，失败后 2 秒重启 |
 | 资源边界 | Go 软内存限制 192 MiB，systemd MemoryHigh 256 MiB / MemoryMax 512 MiB，文件描述符 65,536 |
@@ -25,6 +25,13 @@
 仅当 `X-Forwarded-Proto: http` 时跳转到浏览器 HTTPS 地址；Cloudflare 传来的 HTTPS 访问经 HTTP 回源后直接提供内容，避免自重定向。反向代理立即刷新流式输出。此次变更的备份：`/etc/caddy/Caddyfile.before-chat-flexible-20260910100741` 和 `/etc/obsidianchat/server.env.before-flexible-20260910100741`。
 
 ## 验证结果
+
+### 2026-09-15 全面板宽度调节修复
+
+- 右侧详情／个人设置栏现在可从左侧中缝拖动，个人设置默认 360px、其他详情默认 310px，可在 280–560px 内调节并分别记忆。
+- 管理后台导航栏现在可从右侧中缝拖动，可在 170–360px 内调节并记忆；三处中缝共用悬停手柄、键盘调节和双击复位行为。
+- 前端 15 项测试、类型检查、生产构建和全部 Go 测试通过；服务器二进制哈希与本地发布包一致，服务为 active，内网与公网健康检查均为 200。
+- 公网加载新资源 `index-Bs1bwBmj.js` 和 `index-Dnw9Bali.css`；更新前数据备份为 `/opt/obsidianchat/backups/before-20260915185622.tar.gz`。
 
 ### 2026-09-15 马卡龙主题与可调分栏
 
