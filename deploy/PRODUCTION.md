@@ -1,6 +1,6 @@
 # 当前部署
 
-最近部署日期：2026-09-15。修复提交 `b3aa32a`，发送消息后输入框继续保持焦点；界面提交 `2ccfb6e` 重新设计个人设置。首次部署使用独立数据目录，未上传本机的用户和聊天数据。
+最近部署日期：2026-09-15。界面提交 `df81d90` 增加马卡龙背景、Material You 风格动态控件色和可调联系人栏。首次部署使用独立数据目录，未上传本机的用户和聊天数据。
 
 | 项目 | 当前值 |
 | --- | --- |
@@ -13,9 +13,9 @@
 | 环境配置 | `/etc/obsidianchat/server.env`，仅 root 可读 |
 | 数据目录 | `/data/obsidianchat`，运行账号独占 |
 | 程序入口 | `/opt/obsidianchat/current/obsidianchat` |
-| 当前版本目录 | `/opt/obsidianchat/releases/20260915153237` |
-| Linux 程序大小 | 12,132,512 B |
-| 程序 SHA256 | `a16a33bbcc93f071d53b8017e7747c379308155924feb57da5f4a39281cf3961` |
+| 当前版本目录 | `/opt/obsidianchat/releases/20260915183402` |
+| Linux 程序大小 | 12,140,704 B |
+| 程序 SHA256 | `291e83d98ee9f8949f9a7dd6e3b8bd0b42f882f60642a1585823eeb63e77a9e2` |
 | 防火墙 | 已撤销 TCP 8090 公网规则；应用仅监听回环地址 |
 | 启动策略 | 开机启动，失败后 2 秒重启 |
 | 资源边界 | Go 软内存限制 192 MiB，systemd MemoryHigh 256 MiB / MemoryMax 512 MiB，文件描述符 65,536 |
@@ -25,6 +25,14 @@
 仅当 `X-Forwarded-Proto: http` 时跳转到浏览器 HTTPS 地址；Cloudflare 传来的 HTTPS 访问经 HTTP 回源后直接提供内容，避免自重定向。反向代理立即刷新流式输出。此次变更的备份：`/etc/caddy/Caddyfile.before-chat-flexible-20260910100741` 和 `/etc/obsidianchat/server.env.before-flexible-20260910100741`。
 
 ## 验证结果
+
+### 2026-09-15 马卡龙主题与可调分栏
+
+- 内置背景改为香草、薄荷、云蓝、香芋和蜜桃五种低饱和纯色；旧背景设置自动迁移，并提供对应暗色版本。
+- 个人设置新增 5 种控件强调色和自定义取色器，按钮、选中态、开关、输入控件和发送气泡使用同一套动态色阶。
+- 桌面端联系人栏支持中缝拖拽、方向键调宽、双击复位和宽度持久化；移动端继续使用单栏布局。
+- 11 项前端测试、生产构建和全部 Go 测试通过；服务器二进制哈希与本地发布包一致，服务为 active，内网与公网健康检查均为 200。
+- 公网加载新资源 `index-DkjTo2d8.js` 和 `index-B0Z1dkdu.css`；更新前数据备份为 `/opt/obsidianchat/backups/before-20260915183402.tar.gz`。
 
 ### 2026-09-15 连续输入修复
 
