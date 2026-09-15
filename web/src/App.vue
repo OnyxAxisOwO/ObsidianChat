@@ -26,14 +26,19 @@ import {
   X,
   RefreshCw,
   Bell,
+  Paperclip,
 } from "lucide-vue-next";
 import AuthForm from "./AuthForm.vue";
 import FriendPanel from "./FriendPanel.vue";
 import RoomPanel from "./RoomPanel.vue";
 import AccountPanel from "./AccountPanel.vue";
+import AvatarContent from "./AvatarContent.vue";
+import MessageContent from "./MessageContent.vue";
+import ChallengeDialog from "./ChallengeDialog.vue";
+import { appearance } from "./appearance";
 import { useChat } from "./useChat";
-import { time, errorText, newClientID } from "./api";
-import type { Message } from "./types";
+import { api, time, errorText, newClientID, uploadFile } from "./api";
+import type { Message, Attachment } from "./types";
 const AdminView = defineAsyncComponent(() => import("./AdminView.vue"));
 const {
   me,
@@ -80,6 +85,114 @@ const notificationBusy = ref(false);
 const notificationPromptNever = ref(false),
   notificationDialog = ref<HTMLElement>();
 const renderedPanel = ref("");
+const replyTarget = ref<Message>(),
+  attached = ref<Attachment>(),
+  uploading = ref(false),
+  attachmentInput = ref<HTMLInputElement>(),
+  actionMessage = ref<Message>(),
+  actionsDialog = ref<HTMLDialogElement>(),
+  forwardDialog = ref<HTMLDialogElement>(),
+  forwardQuery = ref(""),
+  actionBusy = ref(false);
+const forwardRooms = computed(() =>
+  rooms.value.filter(
+    (r) =>
+      !r.archived &&
+      r.name.toLowerCase().includes(forwardQuery.value.toLowerCase()),
+  ),
+);
+const wallpaperStyle = computed(() => ({
+  backgroundImage: appearance.wallpaper
+    ? `url(${JSON.stringify(appearance.wallpaper)})`
+    : undefined,
+}));
+const contextPosition = ref({ left: "0px", top: "0px" });
+function messageActions(event: MouseEvent, message: Message) {
+  actionMessage.value = message;
+  contextPosition.value = {
+    left: Math.max(8, Math.min(event.clientX, window.innerWidth - 208)) + "px",
+    top: Math.max(8, Math.min(event.clientY, window.innerHeight - 250)) + "px",
+  };
+  actionsDialog.value?.showModal();
+}
+async function act(action: "reply" | "copy" | "recall" | "forward") {
+  const m = actionMessage.value;
+  if (!m) return;
+  actionsDialog.value?.close();
+  if (action === "reply") {
+    replyTarget.value = m;
+    composer.value?.focus();
+    return;
+  }
+  if (action === "forward") {
+    forwardQuery.value = "";
+    forwardDialog.value?.showModal();
+    return;
+  }
+  try {
+    if (action === "copy") await navigator.clipboard.writeText(m.body);
+    else {
+      const updated = await api<Message>(
+        `/rooms/${m.room_id}/messages/${m.id}`,
+        "DELETE",
+      );
+      messages.value = messages.value.map((v) =>
+        v.id === updated.id ? updated : v,
+      );
+      await refresh();
+    }
+  } catch (e) {
+    report(e);
+  }
+}
+let forwarding: { source: number; room: string; client: string } | undefined;
+async function forwardMessage(room: string) {
+  const m = actionMessage.value;
+  if (!m || actionBusy.value) return;
+  if (!forwarding || forwarding.source !== m.id || forwarding.room !== room)
+    forwarding = { source: m.id, room, client: newClientID() };
+  actionBusy.value = true;
+  sendError.value = "";
+  try {
+    await api(`/rooms/${room}/messages`, "POST", {
+      body: "",
+      client_id: forwarding.client,
+      forward_from: m.id,
+    });
+    forwarding = undefined;
+    forwardDialog.value?.close();
+    await changedRoom(room);
+  } catch (e) {
+    sendError.value = errorText(e);
+  } finally {
+    actionBusy.value = false;
+  }
+}
+async function attach(event: Event) {
+  const input = event.target as HTMLInputElement,
+    file = input.files?.[0];
+  if (!file) return;
+  const room = selected.value;
+  uploading.value = true;
+  sendError.value = "";
+  try {
+    const purpose = ["image/png", "image/jpeg", "image/gif"].includes(file.type)
+      ? "image"
+      : "file";
+    const limits = await api<{ image_mb: number; file_mb: number }>(
+      "/upload-limits",
+    );
+    const max = limits[purpose === "image" ? "image_mb" : "file_mb"];
+    if (file.size > max * 1048576) throw new Error(`文件最大 ${max} MiB`);
+    const result = await uploadFile(file, purpose);
+    if (selected.value === room) attached.value = result;
+  } catch (e) {
+    sendError.value = errorText(e);
+  } finally {
+    uploading.value = false;
+    input.value = "";
+  }
+}
 const enteringMessages = shallowRef(new Set<number>());
 let panelTrigger: HTMLElement | null = null;
 watch(panel, (value, previous) => {
@@ -190,6 +303,8 @@ watch(
 const drafts = new Map<string, string>();
 const pending = new Map<string, { body: string; id: string }>();
 watch(selected, (value, old) => {
+  replyTarget.value = undefined;
+  attached.value = undefined;
   if (old) drafts.set(old, draft.value);
   draft.value = drafts.get(value) || "";
   sendError.value = "";
@@ -245,26 +360,32 @@ async function changed() {
 async function submit() {
   if (
     sending.value ||
-    !draft.value.trim() ||
+    uploading.value ||
+    (!draft.value.trim() && !attached.value) ||
     !active.value ||
     active.value.archived
   )
     return;
   const room = selected.value,
-    body = draft.value.trim();
+    body = draft.value.trim(),
+    extra = { reply_to: replyTarget.value?.id, upload_id: attached.value?.id },
+    signature = JSON.stringify([body, extra]);
   let attempt = pending.get(room);
-  if (!attempt || attempt.body !== body) {
-    attempt = { body, id: newClientID() };
+  if (!attempt || attempt.body !== signature) {
+    attempt = { body: signature, id: newClientID() };
     pending.set(room, attempt);
   }
   sending.value = true;
   sendError.value = "";
   try {
-    await send(body, attempt.id);
+    await send(body, attempt.id, extra);
     pending.delete(room);
     drafts.delete(room);
-    if (selected.value === room && draft.value.trim() === body)
+    if (selected.value === room && draft.value.trim() === body) {
       draft.value = "";
+      attached.value = undefined;
+      replyTarget.value = undefined;
+    }
     await nextTick();
     bottom();
     composer.value?.focus();
@@ -303,6 +424,13 @@ function sameMessageGroup(message: Message, adjacent?: Message) {
 onMounted(boot);
 </script>
 <template>
+  <div
+    class="wallpaper"
+    :class="'background-' + appearance.background"
+    :style="wallpaperStyle"
+  />
+  <div class="wallpaper-shade" />
+  <ChallengeDialog />
   <div class="workspace">
     <header class="topbar">
       <a class="brand" href="/" @click.prevent="admin = false"
@@ -342,7 +470,7 @@ onMounted(boot);
           panel = panel === 'account' ? '' : 'account';
         "
       >
-        {{ me.name.slice(0, 1) }}</button
+        <AvatarContent :user="me.id" :name="me.name" /></button
       ><button v-else class="mobile-only" @click="mobileChat = true">
         登录
       </button>
@@ -434,7 +562,9 @@ onMounted(boot);
               <span class="avatar" :class="{ group: room.kind === 'group' }"
                 ><Users v-if="room.kind === 'group'" :size="19" /><template
                   v-else
-                  >{{ room.name.slice(0, 1) }}</template
+                  ><AvatarContent
+                    :user="room.peer_id"
+                    :name="room.name" /></template
                 ><i
                   v-if="room.kind === 'direct' && room.online"
                   class="online-dot" /></span
@@ -488,7 +618,9 @@ onMounted(boot);
             :disabled="!me"
             @click="panel = panel === 'account' ? '' : 'account'"
           >
-            <span class="avatar small">{{ me?.name.slice(0, 1) || "O" }}</span>
+            <span class="avatar small"
+              ><AvatarContent :user="me?.id" :name="me?.name || 'O'"
+            /></span>
             <div>
               <strong>{{ me?.name || "未登录" }}</strong>
               <p>{{ me ? "@" + me.username : "" }}</p>
@@ -508,8 +640,8 @@ onMounted(boot);
             <div v-if="active" class="avatar">
               <Users v-if="active.kind === 'group'" :size="20" /><template
                 v-else
-                >{{ active.name.slice(0, 1) }}</template
-              >
+                ><AvatarContent :user="active.peer_id" :name="active.name"
+              /></template>
             </div>
             <div>
               <h2>{{ active?.name || "聊天" }}</h2>
@@ -587,12 +719,10 @@ onMounted(boot);
                 </div>
                 <div
                   class="message-row"
+                  @contextmenu.prevent="messageActions($event, message)"
                   :class="{
                     mine: message.sender === me.id,
-                    'group-start': !sameMessageGroup(
-                      message,
-                      messages[i - 1],
-                    ),
+                    'group-start': !sameMessageGroup(message, messages[i - 1]),
                     'group-end': !sameMessageGroup(message, messages[i + 1]),
                     'message-enter': enteringMessages.has(message.id),
                   }"
@@ -604,8 +734,10 @@ onMounted(boot);
                     <span
                       v-if="!sameMessageGroup(message, messages[i + 1])"
                       class="avatar small"
-                      >{{ message.name.slice(0, 1) }}</span
-                    >
+                      ><AvatarContent
+                        :user="message.sender"
+                        :name="message.name"
+                    /></span>
                   </span>
                   <div class="message-content">
                     <span
@@ -614,15 +746,46 @@ onMounted(boot);
                       >{{ message.sender === me.id ? "我" : message.name }}
                       <time>{{ time(message.created_at) }}</time></span
                     >
-                    <div class="bubble">{{ message.body }}</div>
+                    <div class="bubble">
+                      <MessageContent :message="message" />
+                    </div>
                   </div>
-                </div></template
-              >
+                  <button
+                    class="icon-btn message-menu-button"
+                    aria-label="消息操作"
+                    @click="messageActions($event, message)"
+                  >
+                    <MoreHorizontal :size="16" />
+                  </button></div
+              ></template>
             </div>
             <p v-if="sendError" class="send-error error" role="alert">
               {{ sendError }} · 内容已保留，可重试发送
             </p>
             <form class="composer" @submit.prevent="submit">
+              <div v-if="replyTarget" class="compose-reference">
+                <span
+                  >回复 {{ replyTarget.name }}：{{
+                    replyTarget.recalled_at ? "[消息已撤回]" : replyTarget.body
+                  }}</span
+                ><button
+                  type="button"
+                  aria-label="取消回复"
+                  @click="replyTarget = undefined"
+                >
+                  <X :size="14" />
+                </button>
+              </div>
+              <div v-if="attached" class="compose-reference">
+                <span>📎 {{ attached.name }}</span
+                ><button
+                  type="button"
+                  aria-label="移除附件"
+                  @click="attached = undefined"
+                >
+                  <X :size="14" />
+                </button>
+              </div>
               <textarea
                 ref="composer"
                 v-model="draft"
@@ -634,13 +797,38 @@ onMounted(boot);
                 @keydown="keydown"
               />
               <div class="composer-bottom">
+                <input
+                  ref="attachmentInput"
+                  type="file"
+                  hidden
+                  @change="attach"
+                />
+                <button
+                  type="button"
+                  class="icon-btn"
+                  :disabled="sending || uploading || active.archived"
+                  :aria-label="uploading ? '上传中' : '发送图片或文件'"
+                  title="发送图片或文件"
+                  @click="attachmentInput?.click()"
+                >
+                  <RefreshCw
+                    v-if="uploading"
+                    :size="17"
+                    class="spin"
+                  /><Paperclip v-else :size="17" />
+                </button>
                 <span>Enter 发送 · Shift + Enter 换行</span
                 ><span class="spacer" /><span v-if="draft.length">{{
                   draft.length
                 }}</span
                 ><button
                   class="primary send"
-                  :disabled="!draft.trim() || active.archived || sending"
+                  :disabled="
+                    (!draft.trim() && !attached) ||
+                    active.archived ||
+                    sending ||
+                    uploading
+                  "
                   aria-label="发送消息"
                 >
                   <RefreshCw v-if="sending" :size="17" class="spin" /><ArrowUp
@@ -705,6 +893,63 @@ onMounted(boot);
         </Transition>
       </main>
     </Transition>
+    <dialog
+      ref="actionsDialog"
+      class="message-action-menu"
+      :style="contextPosition"
+      aria-label="消息操作"
+      @click="$event.target === actionsDialog && actionsDialog?.close()"
+    >
+      <template v-if="actionMessage"
+        ><button :disabled="!!actionMessage.recalled_at" @click="act('reply')">
+          回复</button
+        ><button :disabled="!!actionMessage.recalled_at" @click="act('copy')">
+          复制</button
+        ><button
+          :disabled="!!actionMessage.recalled_at"
+          @click="act('forward')"
+        >
+          转发</button
+        ><button
+          v-if="actionMessage.sender === me?.id"
+          class="danger"
+          :disabled="!!actionMessage.recalled_at"
+          @click="act('recall')"
+        >
+          撤回</button
+        ><button @click="actionsDialog?.close()">取消</button></template
+      >
+    </dialog>
+    <dialog
+      ref="forwardDialog"
+      class="app-dialog"
+      aria-labelledby="forward-title"
+      @cancel="sendError = ''"
+    >
+      <h2 id="forward-title">转发到</h2>
+      <input
+        v-model="forwardQuery"
+        placeholder="搜索会话"
+        aria-label="搜索转发会话"
+      />
+      <p v-if="sendError" class="error" role="alert">{{ sendError }}</p>
+      <div class="forward-rooms">
+        <button
+          v-for="room in forwardRooms"
+          :key="room.id"
+          :disabled="actionBusy"
+          @click="forwardMessage(room.id)"
+        >
+          {{ room.name }}
+        </button>
+        <p v-if="!forwardRooms.length">没有可转发的会话</p>
+      </div>
+      <div class="dialog-actions">
+        <button :disabled="actionBusy" @click="forwardDialog?.close()">
+          取消
+        </button>
+      </div>
+    </dialog>
     <div
       v-if="me && notificationPromptVisible"
       class="notification-prompt-backdrop"

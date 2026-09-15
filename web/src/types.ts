@@ -29,6 +29,34 @@ export interface Message {
   body: string;
   client_id: string;
   created_at: number;
+  reply_to?: number;
+  reply?: { id: number; name: string; body: string };
+  forward_from?: number;
+  upload_id?: string;
+  attachment?: Attachment;
+  recalled_at?: number;
+}
+export interface Attachment {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+}
+export interface Policy {
+  site_key: string;
+  secret_key?: string;
+  secret_configured: boolean;
+  register: boolean;
+  login: boolean;
+  friend: boolean;
+  group: boolean;
+  avatar_mb: number;
+  image_mb: number;
+  file_mb: number;
+  friends_minute: number;
+  messages_minute: number;
+  challenge_minute: number;
+  challenge_hour: number;
 }
 export interface FriendRequest {
   id: string;

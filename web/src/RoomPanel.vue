@@ -4,6 +4,7 @@ import { X, UserPlus } from "lucide-vue-next";
 import { api, errorText } from "./api";
 import type { Room, User } from "./types";
 import ConfirmButton from "./ConfirmButton.vue";
+import AvatarContent from "./AvatarContent.vue";
 const props = defineProps<{ room: Room; me: User; friends: User[] }>();
 const emit = defineEmits<{ close: []; changed: [] }>();
 const members = ref<User[]>([]),
@@ -61,7 +62,7 @@ async function mutate(
     <div class="side-body">
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="detail-title">
-        <span class="avatar">{{ room.name.slice(0, 1) }}</span>
+        <span class="avatar"><AvatarContent :user="room.peer_id" :name="room.name" /></span>
         <h2>{{ room.name }}</h2>
         <p>
           {{ room.kind === "group" ? members.length + " 位成员" : "私聊"
@@ -96,7 +97,7 @@ async function mutate(
       >
       <h3 class="subheading">{{ room.kind === "group" ? "成员" : "账号" }}</h3>
       <div v-for="u in members" :key="u.id" class="person-row">
-        <span class="avatar small">{{ u.name.slice(0, 1) }}</span>
+        <span class="avatar small"><AvatarContent :user="u.id" :name="u.name" /></span>
         <div class="person-info">
           <strong>{{ u.name }}</strong>
           <p>@{{ u.username }}{{ u.disabled ? " · 已停用" : "" }}</p>

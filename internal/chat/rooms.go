@@ -244,13 +244,54 @@ func (s *Server) updateRoom(w http.ResponseWriter, r *http.Request) error {
 }
 
 type Message struct {
-	ID        int64  `json:"id"`
-	RoomID    string `json:"room_id"`
-	Sender    string `json:"sender"`
-	Name      string `json:"name"`
-	Body      string `json:"body"`
-	ClientID  string `json:"client_id"`
-	CreatedAt int64  `json:"created_at"`
+	ID          int64   `json:"id"`
+	RoomID      string  `json:"room_id"`
+	Sender      string  `json:"sender"`
+	Name        string  `json:"name"`
+	Body        string  `json:"body"`
+	ClientID    string  `json:"client_id"`
+	CreatedAt   int64   `json:"created_at"`
+	ReplyTo     int64   `json:"reply_to"`
+	Reply       *Quote  `json:"reply,omitempty"`
+	ForwardFrom int64   `json:"forward_from"`
+	UploadID    string  `json:"upload_id"`
+	Attachment  *Upload `json:"attachment,omitempty"`
+	RecalledAt  int64   `json:"recalled_at"`
+}
+type Quote struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	Body string `json:"body"`
+}
+
+const messageSelect = `SELECT m.id,m.room_id,m.sender,u.name,m.body,m.client_id,m.created_at,
+ COALESCE(d.reply_to,0),COALESCE(d.forward_from,0),COALESCE(d.upload_id,''),COALESCE(d.recalled_at,0),
+ COALESCE(a.name,''),COALESCE(a.mime,''),COALESCE(a.size,0),COALESCE(qu.name,''),
+ CASE WHEN COALESCE(qd.recalled_at,0)>0 THEN '[消息已撤回]' ELSE COALESCE(q.body,'') END
+ FROM messages m JOIN users u ON u.id=m.sender LEFT JOIN message_details d ON d.message_id=m.id
+ LEFT JOIN uploads a ON a.id=d.upload_id LEFT JOIN messages q ON q.id=d.reply_to
+ LEFT JOIN users qu ON qu.id=q.sender LEFT JOIN message_details qd ON qd.message_id=q.id `
+
+func scanMessage(row interface{ Scan(...any) error }) (Message, error) {
+	var m Message
+	var a Upload
+	var q Quote
+	err := row.Scan(&m.ID, &m.RoomID, &m.Sender, &m.Name, &m.Body, &m.ClientID, &m.CreatedAt, &m.ReplyTo, &m.ForwardFrom, &m.UploadID, &m.RecalledAt, &a.Name, &a.MIME, &a.Size, &q.Name, &q.Body)
+	if m.UploadID != "" {
+		a.ID = m.UploadID
+		m.Attachment = &a
+	}
+	if m.ReplyTo > 0 {
+		q.ID = m.ReplyTo
+		m.Reply = &q
+	}
+	if m.RecalledAt > 0 {
+		m.Body = "[消息已撤回]"
+		m.Attachment = nil
+		m.UploadID = ""
+		m.Reply = nil
+	}
+	return m, err
 }
 
 func (s *Server) messages(w http.ResponseWriter, r *http.Request) error {
@@ -270,16 +311,16 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) error {
 	if n == 0 {
 		return fail(403, "你不在此会话中")
 	}
-	rows, err := s.store.Read.QueryContext(r.Context(), "SELECT m.id,m.room_id,m.sender,u.name,m.body,m.client_id,m.created_at FROM messages m JOIN users u ON u.id=m.sender WHERE m.room_id=? AND m.id<? ORDER BY m.id DESC LIMIT 50", room, before)
+	rows, err := s.store.Read.QueryContext(r.Context(), messageSelect+" WHERE m.room_id=? AND m.id<? ORDER BY m.id DESC LIMIT 50", room, before)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	messages := []Message{}
 	for rows.Next() {
-		var m Message
-		if err = rows.Scan(&m.ID, &m.RoomID, &m.Sender, &m.Name, &m.Body, &m.ClientID, &m.CreatedAt); err != nil {
-			return err
+		m, scanErr := scanMessage(rows)
+		if scanErr != nil {
+			return scanErr
 		}
 		messages = append(messages, m)
 	}
@@ -293,21 +334,43 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) error {
 }
 func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) error {
 	var in struct {
-		Body     string `json:"body"`
-		ClientID string `json:"client_id"`
+		Body        string `json:"body"`
+		ClientID    string `json:"client_id"`
+		ReplyTo     int64  `json:"reply_to"`
+		ForwardFrom int64  `json:"forward_from"`
+		UploadID    string `json:"upload_id"`
 	}
 	if err := decode(w, r, &in); err != nil {
 		return err
 	}
 	in.Body = strings.TrimSpace(in.Body)
-	if in.Body == "" || len(in.Body) > 8192 || len(in.ClientID) < 8 || len(in.ClientID) > 64 {
+	if (in.Body == "" && in.UploadID == "" && in.ForwardFrom == 0) || len(in.Body) > 8192 || len(in.ClientID) < 8 || len(in.ClientID) > 64 || in.ReplyTo < 0 || in.ForwardFrom < 0 {
 		return fail(400, "消息需 1–8192 字节，且必须带有效的消息标识")
 	}
 	user, room := current(r), r.PathValue("id")
+	// Already persisted client IDs go through the transaction's identity checks without
+	// charging another challenge or rejecting a retry at the configured rate limit.
+	var prior int
+	if err := s.store.Read.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM messages WHERE sender=? AND client_id=?", user.ID, in.ClientID).Scan(&prior); err != nil {
+		return err
+	}
+	if prior == 0 {
+		ok, err := s.gate(w, r, "message")
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+	}
 	m := Message{RoomID: room, Sender: user.ID, Name: user.Name, Body: in.Body, ClientID: in.ClientID, CreatedAt: now()}
 	created := false
 	recipients := []string{}
-	err := s.store.tx(r.Context(), func(tx *sql.Tx) error {
+	policy, err := s.policy(r.Context())
+	if err != nil {
+		return err
+	}
+	err = s.store.tx(r.Context(), func(tx *sql.Tx) error {
 		if err := membership(tx, room, user.ID); err != nil {
 			return err
 		}
@@ -317,22 +380,77 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) error {
 		if exists(tx, "SELECT COUNT(*) FROM rooms r JOIN members n ON n.room_id=r.id JOIN users u ON u.id=n.user_id WHERE r.id=? AND r.kind='direct' AND u.disabled=1", room) {
 			return fail(409, "对方账号已停用")
 		}
-		var oldRoom string
-		err := tx.QueryRow("SELECT id,room_id,body,created_at FROM messages WHERE sender=? AND client_id=?", user.ID, in.ClientID).Scan(&m.ID, &oldRoom, &m.Body, &m.CreatedAt)
+		old, err := scanMessage(tx.QueryRow(messageSelect+" WHERE m.sender=? AND m.client_id=?", user.ID, in.ClientID))
 		if err == nil {
-			if oldRoom != room || m.Body != in.Body {
+			if old.RoomID != room || old.ReplyTo != in.ReplyTo || old.ForwardFrom != in.ForwardFrom || (old.RecalledAt == 0 && in.ForwardFrom == 0 && (old.Body != in.Body && !(in.Body == "" && in.UploadID != "") || old.UploadID != in.UploadID)) {
 				return fail(409, "消息标识已用于其他消息")
 			}
+			m = old
 			return nil
 		}
 		if err != sql.ErrNoRows {
 			return err
 		}
-		result, err := tx.Exec("INSERT INTO messages(room_id,sender,body,client_id,created_at) VALUES(?,?,?,?,?)", room, user.ID, in.Body, in.ClientID, m.CreatedAt)
+		var count int
+		if err = tx.QueryRow("SELECT COUNT(*) FROM messages WHERE sender=? AND created_at>?", user.ID, now()-60000).Scan(&count); err != nil {
+			return err
+		}
+		if count >= policy.MessagesMinute {
+			return fail(429, "已达到每分钟消息上限，请稍后发送")
+		}
+		var hour int
+		if policy.ChallengeHour > 0 {
+			if err = tx.QueryRow("SELECT COUNT(*) FROM messages WHERE sender=? AND created_at>?", user.ID, now()-3600000).Scan(&hour); err != nil {
+				return err
+			}
+		}
+		if ((policy.ChallengeMinute > 0 && count >= policy.ChallengeMinute) || (policy.ChallengeHour > 0 && hour >= policy.ChallengeHour)) && r.Context().Value(challengeActionKey{}) != "message" {
+			return &challengeRequired{policy.SiteKey, "message"}
+		}
+		m.ReplyTo = in.ReplyTo
+		m.ForwardFrom = in.ForwardFrom
+		m.UploadID = in.UploadID
+		if in.ReplyTo > 0 {
+			ref, err := scanMessage(tx.QueryRow(messageSelect+" WHERE m.id=? AND m.room_id=?", in.ReplyTo, room))
+			if err != nil || ref.RecalledAt > 0 {
+				return fail(400, "回复的消息不存在或已撤回")
+			}
+		}
+		if in.ForwardFrom > 0 {
+			original, err := scanMessage(tx.QueryRow(messageSelect+" WHERE m.id=?", in.ForwardFrom))
+			if err != nil {
+				return fail(404, "原消息不存在")
+			}
+			if err = membership(tx, original.RoomID, user.ID); err != nil {
+				return err
+			}
+			if original.RecalledAt > 0 {
+				return fail(400, "不能转发已撤回的消息")
+			}
+			m.Body = original.Body
+			m.UploadID = original.UploadID
+		} else if in.UploadID != "" {
+			var a Upload
+			err = tx.QueryRow("SELECT id,name,mime,size FROM uploads WHERE id=? AND owner=? AND purpose IN ('image','file')", in.UploadID, user.ID).Scan(&a.ID, &a.Name, &a.MIME, &a.Size)
+			if err != nil {
+				return fail(400, "附件不存在或不属于你")
+			}
+			if m.Body == "" {
+				m.Body = "[文件] " + a.Name
+			}
+		}
+		result, err := tx.Exec("INSERT INTO messages(room_id,sender,body,client_id,created_at) VALUES(?,?,?,?,?)", room, user.ID, m.Body, in.ClientID, m.CreatedAt)
 		if err != nil {
 			return err
 		}
 		m.ID, err = result.LastInsertId()
+		if err != nil {
+			return err
+		}
+		if _, err = tx.Exec("INSERT INTO message_details(message_id,reply_to,forward_from,upload_id) VALUES(?,?,?,?)", m.ID, m.ReplyTo, m.ForwardFrom, m.UploadID); err != nil {
+			return err
+		}
+		m, err = scanMessage(tx.QueryRow(messageSelect+" WHERE m.id=?", m.ID))
 		if err != nil {
 			return err
 		}
@@ -358,6 +476,39 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) error {
 		s.hub.publish(recipients, map[string]any{"type": "message", "message": m})
 	}
 	return jsonResponse(w, m)
+}
+func (s *Server) recallMessage(w http.ResponseWriter, r *http.Request) error {
+	room := r.PathValue("id")
+	messageID, err := strconv.ParseInt(r.PathValue("message"), 10, 64)
+	if err != nil {
+		return fail(400, "无效消息")
+	}
+	var recalled Message
+	err = s.store.tx(r.Context(), func(tx *sql.Tx) error {
+		if err := membership(tx, room, current(r).ID); err != nil {
+			return err
+		}
+		m, err := scanMessage(tx.QueryRow(messageSelect+" WHERE m.id=? AND m.room_id=?", messageID, room))
+		if err != nil {
+			return fail(404, "消息不存在")
+		}
+		if m.Sender != current(r).ID {
+			return fail(403, "只能撤回自己的消息")
+		}
+		if _, err = tx.Exec("INSERT INTO message_details(message_id,recalled_at) VALUES(?,?) ON CONFLICT(message_id) DO UPDATE SET recalled_at=excluded.recalled_at", messageID, now()); err != nil {
+			return err
+		}
+		if _, err = tx.Exec("UPDATE messages SET body='[消息已撤回]' WHERE id=?", messageID); err != nil {
+			return err
+		}
+		recalled, err = scanMessage(tx.QueryRow(messageSelect+" WHERE m.id=?", messageID))
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	s.hub.publish(s.roomUsers(r.Context(), room), map[string]any{"type": "message_updated", "message": recalled})
+	return jsonResponse(w, recalled)
 }
 func (s *Server) markRead(w http.ResponseWriter, r *http.Request) error {
 	var in struct {

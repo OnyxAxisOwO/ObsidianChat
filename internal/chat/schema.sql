@@ -39,3 +39,19 @@ CREATE INDEX IF NOT EXISTS messages_room ON messages(room_id,id);
 CREATE TABLE IF NOT EXISTS audit (
  id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL, created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS uploads (
+ id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES users(id), name TEXT NOT NULL,
+ mime TEXT NOT NULL, size INTEGER NOT NULL, purpose TEXT NOT NULL, created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS avatars (
+ user_id TEXT PRIMARY KEY REFERENCES users(id), upload_id TEXT NOT NULL REFERENCES uploads(id)
+);
+CREATE TABLE IF NOT EXISTS message_details (
+ message_id INTEGER PRIMARY KEY REFERENCES messages(id), reply_to INTEGER NOT NULL DEFAULT 0,
+ forward_from INTEGER NOT NULL DEFAULT 0, upload_id TEXT NOT NULL DEFAULT '', recalled_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS action_events (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, action TEXT NOT NULL, created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS action_events_user ON action_events(user_id,action,created_at);
+CREATE INDEX IF NOT EXISTS messages_sender_at ON messages(sender,created_at);

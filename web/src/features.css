@@ -1,0 +1,324 @@
+.wallpaper,
+.wallpaper-shade {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -2;
+}
+body {
+  isolation: isolate;
+}
+.wallpaper {
+  background-size: cover;
+  background-position: center;
+  filter: blur(var(--chat-backgroundBlur));
+  transform: scale(1.08);
+}
+.wallpaper-shade {
+  z-index: -1;
+  background: color-mix(in srgb, #000 var(--chat-dim), transparent);
+}
+.background-paper {
+  background-color: var(--surface);
+}
+.background-forest {
+  background-image:
+    radial-gradient(at 15% 20%, #b9dba6, transparent 55%),
+    linear-gradient(130deg, #295949, #1a3a43);
+}
+.background-sunset {
+  background-image:
+    radial-gradient(at 20% 15%, #ffe5a1, transparent 60%),
+    linear-gradient(135deg, #f9aa79, #865b98, #283658);
+}
+.background-night {
+  background-image:
+    radial-gradient(at 80% 15%, #655d98, transparent 55%),
+    linear-gradient(130deg, #16354a, #151324);
+}
+.panel,
+.topbar,
+.app-dialog,
+.message-action-menu,
+.notification-prompt {
+  background: color-mix(
+    in srgb,
+    var(--surface) var(--chat-panelOpacity),
+    transparent
+  );
+  backdrop-filter: blur(var(--chat-panelBlur));
+  -webkit-backdrop-filter: blur(var(--chat-panelBlur));
+}
+.panel-slot {
+  background: transparent;
+}
+.topbar {
+  border-radius: 0 0 18px 18px;
+  padding: 0 12px;
+  margin-bottom: 12px;
+}
+.message-content {
+  max-width: var(--chat-width);
+}
+.bubble,
+.message-row .bubble,
+.message-row.mine .bubble {
+  padding: var(--chat-padding) calc(var(--chat-padding) + 3px);
+  font-size: var(--chat-font);
+  border-radius: var(--chat-radius);
+  line-height: 1.5;
+}
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+button.avatar {
+  padding: 0;
+}
+.avatar-settings {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar-settings > label {
+  flex: 1;
+  min-width: 0;
+}
+.avatar-settings .avatar {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.appearance-settings {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.appearance-settings summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.appearance-settings output {
+  float: right;
+  font-size: 12px;
+  color: var(--muted);
+}
+.appearance-settings input[type="range"] {
+  padding: 6px 0;
+  accent-color: var(--primary);
+  height: 28px;
+}
+.appearance-preview {
+  align-self: flex-start;
+}
+.app-dialog {
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px;
+  width: min(440px, calc(100vw - 32px));
+  max-height: 85dvh;
+  overflow: auto;
+  box-shadow: 0 24px 70px #0004;
+}
+.app-dialog::backdrop {
+  background: #0006;
+  backdrop-filter: blur(3px);
+}
+.app-dialog h2 {
+  margin-bottom: 12px;
+}
+.app-dialog > input {
+  margin: 8px 0;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.challenge-widget {
+  margin-top: 18px;
+  min-height: 65px;
+}
+.message-action-menu {
+  position: fixed;
+  margin: 0;
+  width: 192px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 6px;
+  color: var(--text);
+  box-shadow: 0 10px 36px #0003;
+}
+.message-action-menu::backdrop {
+  background: transparent;
+}
+.message-action-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 8px;
+}
+.message-row {
+  position: relative;
+}
+.message-menu-button {
+  opacity: 0;
+  align-self: center;
+  flex-shrink: 0;
+}
+.message-row:hover .message-menu-button,
+.message-row:focus-within .message-menu-button {
+  opacity: 1;
+}
+.mine .message-menu-button {
+  order: -1;
+}
+.forward-rooms {
+  max-height: 45dvh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.forward-rooms button {
+  text-align: left;
+  border-radius: 10px;
+  background: var(--hover);
+}
+.compose-reference {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.compose-reference span {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compose-reference button {
+  padding: 4px;
+  display: flex;
+}
+.composer input[hidden] {
+  display: none;
+}
+.reply-quote {
+  margin: 0 0 6px;
+  padding: 4px 8px;
+  border-left: 3px solid currentColor;
+  background: #8882;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  max-width: 350px;
+}
+.reply-quote span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.forward-label {
+  display: block;
+  font-size: 11px;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+.recalled-message {
+  font-size: 12px;
+  opacity: 0.65;
+}
+.message-attachment {
+  display: block;
+  word-break: break-word;
+}
+.message-attachment img {
+  display: block;
+  width: 300px;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.policy-form {
+  max-width: 650px;
+  padding-top: 12px;
+}
+.policy-checks {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.policy-checks label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.policy-checks input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+.record-search {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.record-search label {
+  flex: 1;
+  min-width: 160px;
+  font-size: 13px;
+}
+.admin-message-list article {
+  border-top: 1px solid var(--line);
+  padding: 14px 0;
+}
+.admin-message-list header {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.admin-message-list small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.admin-message-list .bubble {
+  display: table;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .message-menu-button {
+    opacity: 0.6;
+    width: 24px;
+    height: 24px;
+  }
+  .topbar {
+    gap: 10px;
+  }
+  .message-attachment img {
+    max-width: 100%;
+  }
+  .app-dialog {
+    padding: 20px;
+  }
+  .record-search {
+    display: grid;
+  }
+  .appearance-settings .stack {
+    gap: 12px;
+  }
+}

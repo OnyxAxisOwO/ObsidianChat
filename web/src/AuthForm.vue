@@ -65,6 +65,7 @@ async function submit() {
         }}
       </h2>
       <p v-if="setup">填写服务启动时输出的初始化令牌。</p>
+      <p v-if="mode === 'register'">本站管理员可查看聊天记录以处理违规内容。</p>
       <p v-if="!loaded && !error">连接中…</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button v-if="!loaded && error" type="button" @click="status">重试</button

@@ -22,7 +22,10 @@ import (
 //go:embed schema.sql
 var schema string
 
-type Store struct{ Read, Write *sql.DB }
+type Store struct {
+	Read, Write *sql.DB
+	UploadDir   string
+}
 
 func Open(path string) (*Store, error) {
 	abs, err := filepath.Abs(path)
@@ -51,7 +54,7 @@ func Open(path string) (*Store, error) {
 	}
 	r.SetMaxOpenConns(8)
 	r.SetMaxIdleConns(4)
-	return &Store{Read: r, Write: w}, nil
+	return &Store{Read: r, Write: w, UploadDir: filepath.Join(filepath.Dir(abs), "uploads")}, nil
 }
 func (s *Store) Close() { s.Read.Close(); s.Write.Close() }
 func (s *Store) tx(ctx context.Context, fn func(*sql.Tx) error) error {

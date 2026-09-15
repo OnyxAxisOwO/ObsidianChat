@@ -4,6 +4,7 @@ import { Search, X, Users, Plus } from "lucide-vue-next";
 import { api, errorText } from "./api";
 import type { User, FriendData } from "./types";
 import ConfirmButton from "./ConfirmButton.vue";
+import AvatarContent from "./AvatarContent.vue";
 const props = defineProps<{
   me: User;
   data: FriendData;
@@ -102,7 +103,7 @@ function create() {
           </button>
         </form>
         <div v-for="user in found" :key="user.id" class="person-row">
-          <span class="avatar small">{{ user.name.slice(0, 1) }}</span>
+          <span class="avatar small"><AvatarContent :user="user.id" :name="user.name" /></span>
           <div class="person-info">
             <strong>{{ user.name }}</strong>
             <p>@{{ user.username }}</p>
@@ -163,7 +164,7 @@ function create() {
           好友 <span>{{ data.friends.length }}</span>
         </h3>
         <div v-for="u in data.friends" :key="u.id" class="person-row">
-          <span class="avatar small">{{ u.name.slice(0, 1) }}</span>
+          <span class="avatar small"><AvatarContent :user="u.id" :name="u.name" /></span>
           <div class="person-info">
             <strong>{{ u.name }}</strong>
             <p>@{{ u.username }}</p>
@@ -186,7 +187,7 @@ function create() {
           class="check-row"
           ><input v-model="members" type="checkbox" :value="u.id" /><span
             class="avatar small"
-            >{{ u.name.slice(0, 1) }}</span
+            ><AvatarContent :user="u.id" :name="u.name" /></span
           ><span>{{ u.name }}</span></label
         ><button class="primary" :disabled="busy">
           <Users :size="15" /> {{ busy ? "创建中…" : "创建群聊" }}

@@ -1,4 +1,12 @@
 :root {
+  --chat-padding: 8px;
+  --chat-radius: 16px;
+  --chat-font: 14px;
+  --chat-width: 80%;
+  --chat-panelOpacity: 88%;
+  --chat-panelBlur: 14px;
+  --chat-backgroundBlur: 0px;
+  --chat-dim: 20%;
   font-family:
     Inter,
     -apple-system,
@@ -677,7 +685,7 @@ strong {
 }
 .bubble {
   background: var(--card);
-  border-radius: 15px 15px 15px 3px;
+  border-radius: var(--chat-radius);
   padding: 12px 16px;
   font-size: 15px;
   line-height: 1.8;
@@ -686,13 +694,13 @@ strong {
   user-select: text;
 }
 .message-row.group-start:not(.group-end) .bubble {
-  border-radius: 15px 15px 5px 5px;
+  border-radius: var(--chat-radius);
 }
 .message-row:not(.group-start):not(.group-end) .bubble {
-  border-radius: 5px;
+  border-radius: var(--chat-radius);
 }
 .message-row.group-end:not(.group-start) .bubble {
-  border-radius: 5px 5px 15px 3px;
+  border-radius: var(--chat-radius);
 }
 .message-row.mine {
   justify-content: flex-end;
@@ -703,16 +711,16 @@ strong {
 .mine .bubble {
   background: var(--primary);
   color: var(--on-primary);
-  border-radius: 15px 15px 3px 15px;
+  border-radius: var(--chat-radius);
 }
 .message-row.mine.group-start:not(.group-end) .bubble {
-  border-radius: 15px 15px 5px 5px;
+  border-radius: var(--chat-radius);
 }
 .message-row.mine:not(.group-start):not(.group-end) .bubble {
-  border-radius: 5px;
+  border-radius: var(--chat-radius);
 }
 .message-row.mine.group-end:not(.group-start) .bubble {
-  border-radius: 5px 5px 3px 15px;
+  border-radius: var(--chat-radius);
 }
 .send-error {
   margin: 0 24px 10px;

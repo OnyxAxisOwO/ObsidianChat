@@ -25,14 +25,15 @@ type Config struct {
 	SecureCookie       bool
 }
 type Server struct {
-	store     *Store
-	hub       *Hub
-	config    Config
-	started   time.Time
-	limits    limiter
-	authSlots chan struct{}
-	stop      chan struct{}
-	dummyHash string
+	store           *Store
+	hub             *Hub
+	config          Config
+	started         time.Time
+	limits          limiter
+	authSlots       chan struct{}
+	stop            chan struct{}
+	dummyHash       string
+	turnstileClient *http.Client
 }
 type userKey struct{}
 
@@ -59,8 +60,29 @@ func (s *Server) Handler(assets fs.FS) http.Handler {
 					return
 				}
 				r = r.WithContext(context.WithValue(r.Context(), userKey{}, u))
-				if r.Method != "GET" && !s.limits.allow("user:"+u.ID, 30, 5) {
+				if r.Method != "GET" && !s.limits.allow("user:"+u.ID, 60, 20) {
 					writeError(w, fail(429, "操作太快，请稍后重试"))
+					return
+				}
+			}
+			action := ""
+			switch pattern {
+			case "POST /api/register":
+				action = "register"
+			case "POST /api/login":
+				action = "login"
+			case "POST /api/friends/requests":
+				action = "friend"
+			case "POST /api/rooms":
+				action = "group"
+			}
+			if action != "" {
+				ok, err := s.gate(w, r, action)
+				if err != nil {
+					writeError(w, err)
+					return
+				}
+				if !ok {
 					return
 				}
 			}
@@ -89,6 +111,14 @@ func (s *Server) Handler(assets fs.FS) http.Handler {
 	add("PATCH /api/rooms/{id}", true, false, s.updateRoom)
 	add("GET /api/rooms/{id}/messages", true, false, s.messages)
 	add("POST /api/rooms/{id}/messages", true, false, s.sendMessage)
+	add("DELETE /api/rooms/{id}/messages/{message}", true, false, s.recallMessage)
+	add("POST /api/uploads", true, false, s.upload)
+	add("GET /api/uploads/{id}", true, false, s.download)
+	add("GET /api/avatars/{id}", true, false, s.avatar)
+	add("GET /api/upload-limits", true, false, s.uploadLimits)
+	add("GET /api/admin/policy", true, true, s.getPolicy)
+	add("PATCH /api/admin/policy", true, true, s.savePolicy)
+	add("GET /api/admin/messages", true, true, s.adminMessages)
 	add("POST /api/rooms/{id}/read", true, false, s.markRead)
 	add("GET /api/events", true, false, s.events)
 	add("GET /api/admin/stats", true, true, s.adminStats)
@@ -120,7 +150,7 @@ func (s *Server) Handler(assets fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			w.Header().Set("Cache-Control", "no-store")
 		}
@@ -129,7 +159,7 @@ func (s *Server) Handler(assets fs.FS) http.Handler {
 				writeError(w, fail(403, "请求来源不受信任"))
 				return
 			}
-			if r.Method != "DELETE" && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			if r.Method != "DELETE" && !(r.Method == "POST" && r.URL.Path == "/api/uploads" && strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data")) && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 				writeError(w, fail(415, "需要 JSON 请求"))
 				return
 			}
@@ -160,6 +190,13 @@ func jsonResponse(w http.ResponseWriter, v any) error {
 	return json.NewEncoder(w).Encode(v)
 }
 func writeError(w http.ResponseWriter, err error) {
+	var challenge *challengeRequired
+	if errors.As(err, &challenge) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(428)
+		jsonResponse(w, map[string]any{"error": challenge.Error(), "challenge": map[string]string{"site_key": challenge.siteKey, "action": challenge.action}})
+		return
+	}
 	status, message := 500, "服务器暂时无法完成请求"
 	var p *problem
 	if errors.As(err, &p) {

@@ -12,6 +12,8 @@ import {
 import { api, errorText, dateTime } from "./api";
 import type { User, Room, Stats } from "./types";
 import ConfirmButton from "./ConfirmButton.vue";
+import AdminPolicy from "./AdminPolicy.vue";
+import AdminMessages from "./AdminMessages.vue";
 defineProps<{ me: User }>();
 const emit = defineEmits<{ close: []; changed: []; sessionChanged: [] }>();
 const tab = ref("overview"),
@@ -33,6 +35,7 @@ const tab = ref("overview"),
   busy = ref(false);
 let serial = 0;
 const paneDirection = ref("forward");
+const recordUser = ref("");
 async function load() {
   const version = ++serial;
   busy.value = true;
@@ -40,7 +43,7 @@ async function load() {
   try {
     const [s, data] = await Promise.all([
       api<Stats>("/admin/stats"),
-      tab.value === "overview"
+      ["overview", "policy", "messages"].includes(tab.value)
         ? Promise.resolve(null)
         : api<unknown>(
             "/admin/" +
@@ -63,7 +66,7 @@ async function load() {
   }
 }
 watch(tab, (value, previous) => {
-  const order = ["overview", "users", "rooms", "audit"];
+  const order = ["overview", "users", "rooms", "audit", "policy", "messages"];
   paneDirection.value =
     order.indexOf(value) < order.indexOf(previous) ? "back" : "forward";
   offset.value = 0;
@@ -99,6 +102,8 @@ const titles: Record<string, string> = {
   users: "用户管理",
   rooms: "群聊管理",
   audit: "操作日志",
+  policy: "验证、上传与反垃圾",
+  messages: "聊天记录",
 };
 onMounted(load);
 </script>
@@ -119,6 +124,8 @@ onMounted(load);
       ><button :class="{ selected: tab === 'audit' }" @click="tab = 'audit'">
         <List :size="17" /> 操作日志
       </button>
+      <button :class="{ selected: tab === 'policy' }" @click="tab = 'policy'"><Activity :size="17" /> 功能设置</button>
+      <button :class="{ selected: tab === 'messages' }" @click="recordUser = ''; tab = 'messages'"><List :size="17" /> 聊天记录</button>
     </aside>
     <section
       :key="tab"
@@ -137,6 +144,8 @@ onMounted(load);
         </button>
       </div>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <AdminPolicy v-if="tab === 'policy'" />
+      <AdminMessages v-if="tab === 'messages'" :user="recordUser" />
       <template v-if="tab === 'overview' && stats"
         ><div class="stats-grid">
           <article>
@@ -232,6 +241,7 @@ onMounted(load);
                   {{ u.disabled ? "已停用" : u.online ? "在线" : "离线" }}
                 </td>
                 <td class="table-actions">
+                  <button @click="recordUser = u.id; tab = 'messages'">聊天记录</button>
                   <ConfirmButton
                     :label="u.disabled ? '启用' : '停用'"
                     :disabled="busy"
@@ -309,7 +319,7 @@ onMounted(load);
           </table>
         </div></template
       >
-      <div v-if="tab !== 'overview'" class="pagination">
+      <div v-if="['users', 'rooms', 'audit'].includes(tab)" class="pagination">
         <span>{{ count() ? offset + 1 : 0 }}–{{ offset + count() }}</span
         ><button :disabled="offset === 0 || busy" @click="page(-50)">
           上一页</button
@@ -317,7 +327,7 @@ onMounted(load);
           下一页
         </button>
       </div>
-      <p v-if="tab !== 'overview' && !count() && !busy" class="muted-note">
+      <p v-if="['users', 'rooms', 'audit'].includes(tab) && !count() && !busy" class="muted-note">
         暂无记录
       </p>
     </section>

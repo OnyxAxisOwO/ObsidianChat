@@ -1,6 +1,7 @@
 import { computed, ref, onBeforeUnmount } from "vue";
 import { api, APIError, errorText } from "./api";
 import type { User, Room, Message, FriendData } from "./types";
+import { refreshAvatar } from "./avatars";
 
 export function useChat() {
   const me = ref<User | null>(null),
@@ -251,6 +252,14 @@ export function useChat() {
           .then(() => loadMessages())
           .catch(report);
       } else if (data.type === "message") receive(data.message);
+      else if (data.type === "avatar") refreshAvatar(data.user_id);
+      else if (data.type === "message_updated") {
+        const update = data.message as Message;
+        messages.value = messages.value.map(m => m.id === update.id ? update :
+          m.reply?.id === update.id ? { ...m, reply: { ...m.reply, body: "[消息已撤回]" } } : m);
+        const room = rooms.value.find(r => r.id === update.room_id);
+        if (room?.last_id === update.id) room.last_message = update.body;
+      }
       else if (data.type === "refresh") scheduleRefresh();
       else if (data.type === "presence") {
         rooms.value
@@ -316,11 +325,12 @@ export function useChat() {
       report(e);
     }
   }
-  async function send(body: string, clientID: string) {
+  async function send(body: string, clientID: string, extra: { reply_to?: number; upload_id?: string; forward_from?: number } = {}) {
     const room = selected.value;
     const m = await api<Message>("/rooms/" + room + "/messages", "POST", {
       body,
       client_id: clientID,
+      ...extra,
     });
     receive(m);
   }
