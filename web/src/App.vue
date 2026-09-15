@@ -388,11 +388,16 @@ async function submit() {
     }
     await nextTick();
     bottom();
-    composer.value?.focus();
   } catch (e) {
     sendError.value = errorText(e);
   } finally {
     sending.value = false;
+    // The textarea is disabled while sending, so it can only receive focus
+    // after the disabled state has been rendered away.
+    await nextTick();
+    if (selected.value === room && !active.value?.archived) {
+      composer.value?.focus();
+    }
   }
 }
 function keydown(event: KeyboardEvent) {
