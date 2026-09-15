@@ -27,7 +27,6 @@ import {
   RefreshCw,
   Bell,
   Paperclip,
-  GripVertical,
 } from "lucide-vue-next";
 import AuthForm from "./AuthForm.vue";
 import FriendPanel from "./FriendPanel.vue";
@@ -36,7 +35,9 @@ import AccountPanel from "./AccountPanel.vue";
 import AvatarContent from "./AvatarContent.vue";
 import MessageContent from "./MessageContent.vue";
 import ChallengeDialog from "./ChallengeDialog.vue";
+import PanelResizer from "./PanelResizer.vue";
 import { appearance } from "./appearance";
+import { storedPanelWidth } from "./panelSizing";
 import { useChat } from "./useChat";
 import { api, time, errorText, newClientID, uploadFile } from "./api";
 import type { Message, Attachment } from "./types";
@@ -85,81 +86,79 @@ const draft = ref(""),
 const defaultContactsWidth = 300;
 const minContactsWidth = 220;
 const maxContactsWidth = 480;
-const savedContactsWidth = localStorage.getItem("oc-contacts-width");
-const storedContactsWidth =
-  savedContactsWidth === null ? Number.NaN : Number(savedContactsWidth);
 const contactsWidth = ref(
-  Number.isFinite(storedContactsWidth)
-    ? Math.max(
-        minContactsWidth,
-        Math.min(maxContactsWidth, storedContactsWidth),
-      )
-    : defaultContactsWidth,
+  storedPanelWidth(
+    "oc-contacts-width",
+    defaultContactsWidth,
+    minContactsWidth,
+    maxContactsWidth,
+  ),
+);
+const defaultSidePanelWidth = 310;
+const defaultSettingsPanelWidth = 360;
+const minSidePanelWidth = 280;
+const maxSidePanelWidth = 560;
+const sidePanelWidth = ref(
+  storedPanelWidth(
+    "oc-side-panel-width",
+    defaultSidePanelWidth,
+    minSidePanelWidth,
+    maxSidePanelWidth,
+  ),
+);
+const settingsPanelWidth = ref(
+  storedPanelWidth(
+    "oc-settings-panel-width",
+    defaultSettingsPanelWidth,
+    minSidePanelWidth,
+    maxSidePanelWidth,
+  ),
 );
 const layoutElement = ref<HTMLElement>();
 const resizingContacts = ref(false);
+const resizingSidePanel = ref(false);
 function contactsWidthLimit() {
   const layoutWidth = layoutElement.value?.clientWidth ?? window.innerWidth;
-  const sidePanelWidth =
+  const sidePanelFootprint =
     layoutElement.value?.querySelector<HTMLElement>(".panel-slot")
       ?.offsetWidth ?? 0;
   return Math.max(
     minContactsWidth,
     Math.min(
       maxContactsWidth,
-      layoutWidth - 12 - sidePanelWidth - (sidePanelWidth ? 12 : 0) - 320,
+      layoutWidth - 12 - sidePanelFootprint - 320,
     ),
   );
-}
-function updateContactsWidth(value: number, persist = false) {
-  contactsWidth.value = Math.max(
-    minContactsWidth,
-    Math.min(contactsWidthLimit(), value),
-  );
-  if (persist)
-    localStorage.setItem("oc-contacts-width", String(contactsWidth.value));
-}
-function dragContacts(event: PointerEvent) {
-  if (!resizingContacts.value || !layoutElement.value) return;
-  updateContactsWidth(
-    event.clientX - layoutElement.value.getBoundingClientRect().left,
-  );
-}
-function finishContactsResize() {
-  if (!resizingContacts.value) return;
-  resizingContacts.value = false;
-  updateContactsWidth(contactsWidth.value, true);
-  window.removeEventListener("pointermove", dragContacts);
-  window.removeEventListener("pointerup", finishContactsResize);
-  window.removeEventListener("pointercancel", finishContactsResize);
-}
-function beginContactsResize(event: PointerEvent) {
-  if (mobile.value || panel.value) return;
-  event.preventDefault();
-  resizingContacts.value = true;
-  window.addEventListener("pointermove", dragContacts);
-  window.addEventListener("pointerup", finishContactsResize);
-  window.addEventListener("pointercancel", finishContactsResize);
-}
-function resizeContactsWithKeyboard(event: KeyboardEvent) {
-  if (mobile.value || panel.value) return;
-  const changes: Record<string, number> = {
-    ArrowLeft: contactsWidth.value - 12,
-    ArrowRight: contactsWidth.value + 12,
-    Home: minContactsWidth,
-    End: contactsWidthLimit(),
-  };
-  if (!(event.key in changes)) return;
-  event.preventDefault();
-  updateContactsWidth(changes[event.key]!, true);
-}
-function resetContactsWidth() {
-  updateContactsWidth(defaultContactsWidth, true);
 }
 const notificationBusy = ref(false);
 const notificationPromptNever = ref(false),
   notificationDialog = ref<HTMLElement>();
 const renderedPanel = ref("");
+const activeSidePanelWidth = computed({
+  get: () =>
+    renderedPanel.value === "account"
+      ? settingsPanelWidth.value
+      : sidePanelWidth.value,
+  set: (value: number) => {
+    if (renderedPanel.value === "account") settingsPanelWidth.value = value;
+    else sidePanelWidth.value = value;
+  },
+});
+function sidePanelWidthLimit() {
+  const layoutWidth = layoutElement.value?.clientWidth ?? window.innerWidth;
+  const contacts = layoutElement.value?.querySelector<HTMLElement>(".contacts");
+  const contactFootprint = contacts
+    ? contacts.offsetWidth +
+      Number.parseFloat(getComputedStyle(contacts).marginLeft)
+    : contactsWidth.value;
+  return Math.max(
+    minSidePanelWidth,
+    Math.min(
+      maxSidePanelWidth,
+      layoutWidth - Math.max(0, contactFootprint) - 24 - 320,
+    ),
+  );
+}
 const replyTarget = ref<Message>(),
   attached = ref<Attachment>(),
   uploading = ref(false),
@@ -341,7 +340,6 @@ const mobileQuery = matchMedia("(max-width:640px)"),
 const resize = () => (mobile.value = mobileQuery.matches);
 mobileQuery.addEventListener("change", resize);
 onBeforeUnmount(() => mobileQuery.removeEventListener("change", resize));
-onBeforeUnmount(finishContactsResize);
 watchEffect(() => {
   canRead.value =
     !admin.value && (!mobile.value || (mobileChat.value && !panel.value));
@@ -578,9 +576,13 @@ onMounted(boot);
           'has-room': mobileChat,
           'has-panel': !!panel,
           'has-settings': renderedPanel === 'account',
-          'is-resizing': resizingContacts,
+          'is-resizing': resizingContacts || resizingSidePanel,
+          'is-resizing-contacts': resizingContacts,
         }"
-        :style="{ '--contacts-width': contactsWidth + 'px' }"
+        :style="{
+          '--contacts-width': contactsWidth + 'px',
+          '--panel-width': activeSidePanelWidth + 'px',
+        }"
       >
         <aside class="contacts panel" :inert="mobile && !!panel">
           <div class="section-head">
@@ -716,25 +718,17 @@ onMounted(boot);
             <span class="spacer" /><Settings :size="17" />
           </button>
         </aside>
-        <div
-          class="panel-resizer"
-          role="separator"
-          tabindex="0"
-          aria-label="调整联系人栏宽度"
-          aria-orientation="vertical"
-          :aria-disabled="mobile || !!panel"
-          :aria-valuemin="minContactsWidth"
-          :aria-valuemax="Math.round(contactsWidthLimit())"
-          :aria-valuenow="Math.round(contactsWidth)"
-          title="拖动调整联系人栏宽度；双击恢复默认"
-          @pointerdown="beginContactsResize"
-          @keydown="resizeContactsWithKeyboard"
-          @dblclick="resetContactsWidth"
-        >
-          <span class="resize-handle" aria-hidden="true"
-            ><GripVertical :size="16"
-          /></span>
-        </div>
+        <PanelResizer
+          v-model="contactsWidth"
+          class="contacts-resizer"
+          label="拖动调整联系人栏宽度"
+          storage-key="oc-contacts-width"
+          :min="minContactsWidth"
+          :max="contactsWidthLimit()"
+          :default-value="defaultContactsWidth"
+          :disabled="mobile || !!panel"
+          @dragging="resizingContacts = $event"
+        />
         <section class="chat panel" :inert="mobile && !!panel">
           <div class="chat-head">
             <button
@@ -957,7 +951,28 @@ onMounted(boot);
             :inert="!panel"
             @keydown.esc.stop="panel = ''"
           >
-            <Transition name="panel-content" mode="out-in">
+            <PanelResizer
+              v-model="activeSidePanelWidth"
+              class="side-panel-resizer"
+              label="拖动调整右侧面板宽度"
+              :storage-key="
+                renderedPanel === 'account'
+                  ? 'oc-settings-panel-width'
+                  : 'oc-side-panel-width'
+              "
+              :min="minSidePanelWidth"
+              :max="sidePanelWidthLimit()"
+              :default-value="
+                renderedPanel === 'account'
+                  ? defaultSettingsPanelWidth
+                  : defaultSidePanelWidth
+              "
+              :direction="-1"
+              :disabled="mobile"
+              @dragging="resizingSidePanel = $event"
+            />
+            <div class="panel-host">
+              <Transition name="panel-content" mode="out-in">
               <FriendPanel
                 v-if="renderedPanel === 'friends' || renderedPanel === 'group'"
                 :key="renderedPanel"
@@ -995,7 +1010,8 @@ onMounted(boot);
                 "
                 @logout="logout"
               />
-            </Transition>
+              </Transition>
+            </div>
           </div>
         </Transition>
       </main>

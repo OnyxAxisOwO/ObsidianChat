@@ -352,7 +352,7 @@ strong {
 }
 .panel-resizer:hover::before,
 .panel-resizer:focus-visible::before,
-.layout.is-resizing .panel-resizer::before {
+.panel-resizer.active::before {
   opacity: 0.72;
   transform: scaleY(1);
 }
@@ -377,20 +377,25 @@ strong {
 }
 .panel-resizer:hover .resize-handle,
 .panel-resizer:focus-visible .resize-handle,
-.layout.is-resizing .resize-handle {
+.panel-resizer.active .resize-handle {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
 }
 .layout.is-resizing,
-.layout.is-resizing * {
+.layout.is-resizing *,
+.admin-layout.is-resizing,
+.admin-layout.is-resizing * {
   cursor: col-resize !important;
   user-select: none !important;
 }
-.layout.is-resizing .contacts {
+.layout.is-resizing-contacts .contacts {
   transition: none;
 }
-.layout.has-panel .panel-resizer {
+.layout.has-panel .contacts-resizer {
   pointer-events: none;
+}
+.panel-resizer.disabled {
+  cursor: default;
 }
 .chat-head {
   height: 84px;
@@ -934,12 +939,12 @@ strong {
 }
 .admin-layout {
   display: flex;
-  gap: 12px;
+  gap: 0;
   flex: 1;
   min-height: 0;
 }
 .admin-nav {
-  width: 210px;
+  width: var(--admin-nav-width, 210px);
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -1194,7 +1199,7 @@ td code {
     width: 300px;
   }
   .admin-nav {
-    width: 170px;
+    width: var(--admin-nav-width, 170px);
   }
   .admin-main {
     padding: 20px;

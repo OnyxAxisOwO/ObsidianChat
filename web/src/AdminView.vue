@@ -14,8 +14,27 @@ import type { User, Room, Stats } from "./types";
 import ConfirmButton from "./ConfirmButton.vue";
 import AdminPolicy from "./AdminPolicy.vue";
 import AdminMessages from "./AdminMessages.vue";
+import PanelResizer from "./PanelResizer.vue";
+import { storedPanelWidth } from "./panelSizing";
 defineProps<{ me: User }>();
 const emit = defineEmits<{ close: []; changed: []; sessionChanged: [] }>();
+const defaultNavWidth = 210;
+const minNavWidth = 170;
+const maxNavWidth = 360;
+const navWidth = ref(
+  storedPanelWidth(
+    "oc-admin-nav-width",
+    defaultNavWidth,
+    minNavWidth,
+    maxNavWidth,
+  ),
+);
+const adminLayout = ref<HTMLElement>();
+const resizingNav = ref(false);
+function navWidthLimit() {
+  const width = adminLayout.value?.clientWidth ?? window.innerWidth;
+  return Math.max(minNavWidth, Math.min(maxNavWidth, width - 360));
+}
 const tab = ref("overview"),
   stats = ref<Stats>(),
   users = ref<User[]>([]),
@@ -108,7 +127,12 @@ const titles: Record<string, string> = {
 onMounted(load);
 </script>
 <template>
-  <main class="admin-layout">
+  <main
+    ref="adminLayout"
+    class="admin-layout"
+    :class="{ 'is-resizing': resizingNav }"
+    :style="{ '--admin-nav-width': navWidth + 'px' }"
+  >
     <aside class="admin-nav panel">
       <button @click="emit('close')"><ArrowLeft :size="17" /> 返回聊天</button>
       <h1>管理后台</h1>
@@ -127,6 +151,16 @@ onMounted(load);
       <button :class="{ selected: tab === 'policy' }" @click="tab = 'policy'"><Activity :size="17" /> 功能设置</button>
       <button :class="{ selected: tab === 'messages' }" @click="recordUser = ''; tab = 'messages'"><List :size="17" /> 聊天记录</button>
     </aside>
+    <PanelResizer
+      v-model="navWidth"
+      class="admin-resizer"
+      label="拖动调整管理导航栏宽度"
+      storage-key="oc-admin-nav-width"
+      :min="minNavWidth"
+      :max="navWidthLimit()"
+      :default-value="defaultNavWidth"
+      @dragging="resizingNav = $event"
+    />
     <section
       :key="tab"
       class="admin-main panel"

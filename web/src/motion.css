@@ -1,6 +1,7 @@
 /* Keep palette transitions before the motion classes so they cannot replace panel travel. */
 .panel,
 .panel-slot,
+.panel-host,
 .avatar,
 .bubble,
 input,
@@ -14,16 +15,22 @@ select {
 .panel-slot {
   position: relative;
   display: flex;
+  flex-direction: row;
+  flex: 0 0 calc(var(--panel-width) + var(--panel-gap));
+  width: calc(var(--panel-width) + var(--panel-gap));
+  min-height: 0;
+}
+.panel-host {
+  display: flex;
   flex-direction: column;
   flex: 0 0 var(--panel-width);
   width: var(--panel-width);
   min-height: 0;
   border-radius: var(--radius);
-  background: var(--surface);
+  background: transparent;
   overflow: hidden;
-  margin-left: var(--panel-gap);
 }
-.panel-slot > .side-panel {
+.panel-host > .side-panel {
   width: 100%;
   height: 100%;
   flex: 1;
@@ -174,8 +181,11 @@ select {
     position: absolute;
     inset: 0;
     width: 100%;
-    margin-left: 0;
     z-index: 3;
+  }
+  .panel-host {
+    width: 100%;
+    flex: 1;
   }
   .panel-slide-enter-active,
   .panel-slide-leave-active {

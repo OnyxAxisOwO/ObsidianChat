@@ -678,11 +678,6 @@
     transform: rotate(360deg);
   }
 }
-@media (min-width: 641px) {
-  .layout.has-settings {
-    --panel-width: 360px;
-  }
-}
 @media (max-width: 640px) {
   .settings-header {
     padding-top: 17px;
