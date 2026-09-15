@@ -27,6 +27,7 @@ import {
   RefreshCw,
   Bell,
   Paperclip,
+  GripVertical,
 } from "lucide-vue-next";
 import AuthForm from "./AuthForm.vue";
 import FriendPanel from "./FriendPanel.vue";
@@ -81,6 +82,80 @@ const draft = ref(""),
   olderLoading = ref(false),
   mobileChat = ref(false),
   sendError = ref("");
+const defaultContactsWidth = 300;
+const minContactsWidth = 220;
+const maxContactsWidth = 480;
+const savedContactsWidth = localStorage.getItem("oc-contacts-width");
+const storedContactsWidth =
+  savedContactsWidth === null ? Number.NaN : Number(savedContactsWidth);
+const contactsWidth = ref(
+  Number.isFinite(storedContactsWidth)
+    ? Math.max(
+        minContactsWidth,
+        Math.min(maxContactsWidth, storedContactsWidth),
+      )
+    : defaultContactsWidth,
+);
+const layoutElement = ref<HTMLElement>();
+const resizingContacts = ref(false);
+function contactsWidthLimit() {
+  const layoutWidth = layoutElement.value?.clientWidth ?? window.innerWidth;
+  const sidePanelWidth =
+    layoutElement.value?.querySelector<HTMLElement>(".panel-slot")
+      ?.offsetWidth ?? 0;
+  return Math.max(
+    minContactsWidth,
+    Math.min(
+      maxContactsWidth,
+      layoutWidth - 12 - sidePanelWidth - (sidePanelWidth ? 12 : 0) - 320,
+    ),
+  );
+}
+function updateContactsWidth(value: number, persist = false) {
+  contactsWidth.value = Math.max(
+    minContactsWidth,
+    Math.min(contactsWidthLimit(), value),
+  );
+  if (persist)
+    localStorage.setItem("oc-contacts-width", String(contactsWidth.value));
+}
+function dragContacts(event: PointerEvent) {
+  if (!resizingContacts.value || !layoutElement.value) return;
+  updateContactsWidth(
+    event.clientX - layoutElement.value.getBoundingClientRect().left,
+  );
+}
+function finishContactsResize() {
+  if (!resizingContacts.value) return;
+  resizingContacts.value = false;
+  updateContactsWidth(contactsWidth.value, true);
+  window.removeEventListener("pointermove", dragContacts);
+  window.removeEventListener("pointerup", finishContactsResize);
+  window.removeEventListener("pointercancel", finishContactsResize);
+}
+function beginContactsResize(event: PointerEvent) {
+  if (mobile.value || panel.value) return;
+  event.preventDefault();
+  resizingContacts.value = true;
+  window.addEventListener("pointermove", dragContacts);
+  window.addEventListener("pointerup", finishContactsResize);
+  window.addEventListener("pointercancel", finishContactsResize);
+}
+function resizeContactsWithKeyboard(event: KeyboardEvent) {
+  if (mobile.value || panel.value) return;
+  const changes: Record<string, number> = {
+    ArrowLeft: contactsWidth.value - 12,
+    ArrowRight: contactsWidth.value + 12,
+    Home: minContactsWidth,
+    End: contactsWidthLimit(),
+  };
+  if (!(event.key in changes)) return;
+  event.preventDefault();
+  updateContactsWidth(changes[event.key]!, true);
+}
+function resetContactsWidth() {
+  updateContactsWidth(defaultContactsWidth, true);
+}
 const notificationBusy = ref(false);
 const notificationPromptNever = ref(false),
   notificationDialog = ref<HTMLElement>();
@@ -266,6 +341,7 @@ const mobileQuery = matchMedia("(max-width:640px)"),
 const resize = () => (mobile.value = mobileQuery.matches);
 mobileQuery.addEventListener("change", resize);
 onBeforeUnmount(() => mobileQuery.removeEventListener("change", resize));
+onBeforeUnmount(finishContactsResize);
 watchEffect(() => {
   canRead.value =
     !admin.value && (!mobile.value || (mobileChat.value && !panel.value));
@@ -496,12 +572,15 @@ onMounted(boot);
       />
       <main
         v-else
+        ref="layoutElement"
         class="layout"
         :class="{
           'has-room': mobileChat,
           'has-panel': !!panel,
           'has-settings': renderedPanel === 'account',
+          'is-resizing': resizingContacts,
         }"
+        :style="{ '--contacts-width': contactsWidth + 'px' }"
       >
         <aside class="contacts panel" :inert="mobile && !!panel">
           <div class="section-head">
@@ -637,6 +716,25 @@ onMounted(boot);
             <span class="spacer" /><Settings :size="17" />
           </button>
         </aside>
+        <div
+          class="panel-resizer"
+          role="separator"
+          tabindex="0"
+          aria-label="调整联系人栏宽度"
+          aria-orientation="vertical"
+          :aria-disabled="mobile || !!panel"
+          :aria-valuemin="minContactsWidth"
+          :aria-valuemax="Math.round(contactsWidthLimit())"
+          :aria-valuenow="Math.round(contactsWidth)"
+          title="拖动调整联系人栏宽度；双击恢复默认"
+          @pointerdown="beginContactsResize"
+          @keydown="resizeContactsWithKeyboard"
+          @dblclick="resetContactsWidth"
+        >
+          <span class="resize-handle" aria-hidden="true"
+            ><GripVertical :size="16"
+          /></span>
+        </div>
         <section class="chat panel" :inert="mobile && !!panel">
           <div class="chat-head">
             <button

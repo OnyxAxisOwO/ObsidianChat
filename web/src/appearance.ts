@@ -7,9 +7,10 @@ const defaults = {
   panelOpacity: 88,
   panelBlur: 14,
   backgroundBlur: 0,
-  dim: 20,
+  dim: 0,
   wallpaper: "",
-  background: "paper",
+  background: "mint",
+  accent: "#8fb49c",
 };
 export const appearance = reactive({ ...defaults });
 try {
@@ -17,6 +18,18 @@ try {
   for (const key of Object.keys(defaults) as (keyof typeof defaults)[]) {
     if (typeof saved[key] === typeof defaults[key])
       Object.assign(appearance, { [key]: saved[key] });
+  }
+  const legacyBackgrounds: Record<string, string> = {
+    paper: "vanilla",
+    forest: "mint",
+    sunset: "peach",
+    night: "lavender",
+  };
+  if (legacyBackgrounds[appearance.background]) {
+    appearance.background = legacyBackgrounds[appearance.background];
+    // The old photographic gradients needed a dark overlay. The new solid
+    // pastel themes are designed to remain clear without one.
+    if (saved.dim === 20) appearance.dim = 0;
   }
 } catch {
   /* Defaults remain usable when browser storage is unavailable. */
@@ -39,6 +52,8 @@ for (const r of appearanceRanges)
       Number.isFinite(appearance[r.key]) ? appearance[r.key] : defaults[r.key],
     ),
   );
+if (!/^#[0-9a-f]{6}$/i.test(appearance.accent))
+  appearance.accent = defaults.accent;
 export function resetAppearance() {
   Object.assign(appearance, defaults);
 }
@@ -53,6 +68,7 @@ watch(
     const root = document.documentElement.style;
     for (const r of appearanceRanges)
       root.setProperty("--chat-" + r.key, value[r.key] + r.unit);
+    root.setProperty("--accent-seed", value.accent);
   },
   { deep: true, immediate: true },
 );

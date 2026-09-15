@@ -53,10 +53,18 @@ const sections = [
   { key: "account", label: "账号", icon: UserRound },
 ];
 const backgrounds = [
-  { key: "paper", label: "原色", caption: "简单一点，也很好。" },
-  { key: "forest", label: "青野", caption: "把一片自然，带进聊天。" },
-  { key: "sunset", label: "暮光", caption: "留住日落的温柔。" },
-  { key: "night", label: "星夜", caption: "让灵感，在夜色中相遇。" },
+  { key: "vanilla", label: "香草", caption: "柔和的奶油白，安静又耐看。" },
+  { key: "mint", label: "薄荷", caption: "像参考图一样清爽的浅绿色。" },
+  { key: "sky", label: "云蓝", caption: "低饱和的晴空蓝，轻盈不刺眼。" },
+  { key: "lavender", label: "香芋", caption: "带一点灰度的温柔浅紫。" },
+  { key: "peach", label: "蜜桃", caption: "柔软温暖的淡粉橘。" },
+];
+const accents = [
+  { color: "#8fb49c", label: "薄荷" },
+  { color: "#8bafc2", label: "天空" },
+  { color: "#a79aba", label: "香芋" },
+  { color: "#cc9b87", label: "蜜桃" },
+  { color: "#b68c9a", label: "莓果" },
 ];
 const bubbleRanges = appearanceRanges.slice(0, 4);
 const surfaceRanges = appearanceRanges.slice(4, 6);
@@ -293,6 +301,54 @@ async function save() {
             >
               移除壁纸，使用主题背景
             </button>
+          </section>
+
+          <section class="settings-section accent-section">
+            <div class="settings-section-title">
+              <h3>控件颜色</h3>
+              <span>Material You 风格</span>
+            </div>
+            <div class="accent-options" aria-label="控件强调色">
+              <button
+                v-for="accent in accents"
+                :key="accent.color"
+                type="button"
+                class="accent-option"
+                :class="{ selected: appearance.accent === accent.color }"
+                :aria-label="'控件颜色：' + accent.label"
+                :aria-pressed="appearance.accent === accent.color"
+                :title="accent.label"
+                @click="appearance.accent = accent.color"
+              >
+                <span :style="{ backgroundColor: accent.color }">
+                  <Check
+                    v-if="appearance.accent === accent.color"
+                    :size="13"
+                    :stroke-width="3"
+                  />
+                </span>
+              </button>
+              <label
+                class="accent-custom"
+                :class="{
+                  selected: !accents.some(
+                    (accent) => accent.color === appearance.accent,
+                  ),
+                }"
+                title="选择自定义颜色"
+                aria-label="自定义控件颜色"
+              >
+                <input v-model="appearance.accent" type="color" />
+                <span
+                  class="accent-custom-swatch"
+                  :style="{ '--custom-accent': appearance.accent }"
+                  ><Palette :size="14"
+                /></span>
+              </label>
+            </div>
+            <p class="theme-caption">
+              按钮、选中状态、开关和发出的消息会使用同一套动态色阶。
+            </p>
           </section>
 
           <section class="settings-control-card">

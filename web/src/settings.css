@@ -1,10 +1,7 @@
 .account-settings {
-  --settings-accent: #507868;
+  --settings-accent: var(--primary);
   padding-top: 0;
   border: 1px solid var(--line);
-}
-:root[data-theme="dark"] .account-settings {
-  --settings-accent: #a3c9b8;
 }
 .settings-header {
   display: flex;
@@ -116,8 +113,8 @@
   font-size: 12px;
 }
 .settings-tabs button.selected {
-  background: var(--card);
-  color: var(--text);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
   box-shadow:
     0 1px 4px #0000000d,
     0 0 0 1px var(--line);
@@ -157,9 +154,6 @@
   border-radius: 16px;
   border: 1px solid var(--line);
 }
-.settings-preview.background-paper {
-  background: linear-gradient(140deg, var(--card), var(--field));
-}
 .preview-wallpaper {
   position: absolute;
   inset: -10px;
@@ -193,7 +187,7 @@
   margin-bottom: 3px;
   text-shadow: 0 1px 3px #0005;
 }
-.background-paper .preview-label {
+.settings-preview .preview-label {
   color: var(--text);
   text-shadow: none;
 }
@@ -249,8 +243,8 @@
 }
 .theme-options {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
 }
 .theme-option {
   display: flex;
@@ -275,9 +269,6 @@
   transition:
     box-shadow 150ms,
     transform 150ms;
-}
-.theme-swatch.background-paper {
-  background: linear-gradient(145deg, #faf9f6 50%, #e9e7e2 50%);
 }
 .theme-option:hover .theme-swatch {
   transform: translateY(-2px);
@@ -307,6 +298,72 @@
 .theme-caption {
   font-size: 10px;
   margin: 9px 0 13px;
+}
+.accent-section {
+  padding-top: 2px;
+}
+.accent-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.accent-option,
+.accent-custom {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.accent-option > span,
+.accent-custom-swatch {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border: 1px solid #00000012;
+  border-radius: 50%;
+  color: #fff;
+  transition:
+    transform 150ms var(--motion-ease),
+    box-shadow 150ms ease;
+}
+.accent-option:hover {
+  background: transparent;
+}
+.accent-option:hover > span,
+.accent-custom:hover .accent-custom-swatch {
+  transform: scale(1.08);
+}
+.accent-option.selected > span {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--settings-accent);
+}
+.accent-custom.selected .accent-custom-swatch {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--settings-accent);
+}
+.accent-custom input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.accent-custom-swatch {
+  background:
+    linear-gradient(var(--custom-accent), var(--custom-accent)) padding-box,
+    conic-gradient(#eaa, #edda92, #9dcaac, #9ec7df, #c4acd6, #eaa) border-box;
+  border: 2px solid transparent;
+}
+.accent-custom:focus-within .accent-custom-swatch {
+  box-shadow: 0 0 0 3px var(--ring);
 }
 .wallpaper-upload {
   display: flex;

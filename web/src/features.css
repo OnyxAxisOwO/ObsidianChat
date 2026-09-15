@@ -18,23 +18,35 @@ body {
   z-index: -1;
   background: color-mix(in srgb, #000 var(--chat-dim), transparent);
 }
-.background-paper {
-  background-color: var(--surface);
+.background-vanilla {
+  background-color: #f3eee3;
 }
-.background-forest {
-  background-image:
-    radial-gradient(at 15% 20%, #b9dba6, transparent 55%),
-    linear-gradient(130deg, #295949, #1a3a43);
+.background-mint {
+  background-color: #dfeadf;
 }
-.background-sunset {
-  background-image:
-    radial-gradient(at 20% 15%, #ffe5a1, transparent 60%),
-    linear-gradient(135deg, #f9aa79, #865b98, #283658);
+.background-sky {
+  background-color: #dfe8ed;
 }
-.background-night {
-  background-image:
-    radial-gradient(at 80% 15%, #655d98, transparent 55%),
-    linear-gradient(130deg, #16354a, #151324);
+.background-lavender {
+  background-color: #e8e1eb;
+}
+.background-peach {
+  background-color: #f1e1da;
+}
+:root[data-theme="dark"] .background-vanilla {
+  background-color: #292722;
+}
+:root[data-theme="dark"] .background-mint {
+  background-color: #202923;
+}
+:root[data-theme="dark"] .background-sky {
+  background-color: #20272b;
+}
+:root[data-theme="dark"] .background-lavender {
+  background-color: #27232b;
+}
+:root[data-theme="dark"] .background-peach {
+  background-color: #2c2421;
 }
 .panel,
 .topbar,

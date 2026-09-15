@@ -21,6 +21,7 @@ select {
   border-radius: var(--radius);
   background: var(--surface);
   overflow: hidden;
+  margin-left: var(--panel-gap);
 }
 .panel-slot > .side-panel {
   width: 100%;
@@ -75,7 +76,7 @@ select {
   inset: 0 auto 0 0;
   width: calc((100% - 8px) / 3);
   border-radius: 999px;
-  background: var(--card);
+  background: var(--primary-container);
   transform: translateX(calc(var(--tab-index, 0) * (100% + 4px)));
   transition:
     transform var(--motion-panel) var(--motion-ease),
@@ -173,6 +174,7 @@ select {
     position: absolute;
     inset: 0;
     width: 100%;
+    margin-left: 0;
     z-index: 3;
   }
   .panel-slide-enter-active,

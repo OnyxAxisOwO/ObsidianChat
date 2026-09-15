@@ -6,7 +6,8 @@
   --chat-panelOpacity: 88%;
   --chat-panelBlur: 14px;
   --chat-backgroundBlur: 0px;
-  --chat-dim: 20%;
+  --chat-dim: 0%;
+  --accent-seed: #8fb49c;
   font-family:
     Inter,
     -apple-system,
@@ -21,12 +22,14 @@
   --muted: #6e6e74;
   --card: #fff;
   --surface: #f4f4f5;
-  --high: #ededef;
-  --field: #e8e8eb;
-  --primary: #18181b;
+  --high: color-mix(in srgb, var(--accent-seed) 17%, #ededef);
+  --field: color-mix(in srgb, var(--accent-seed) 10%, #e8e8eb);
+  --primary: color-mix(in srgb, var(--accent-seed) 55%, #26322b);
   --on-primary: #fff;
-  --hover: rgba(24, 24, 27, 0.06);
-  --ring: rgba(24, 24, 27, 0.22);
+  --primary-container: color-mix(in srgb, var(--accent-seed) 28%, #fff);
+  --on-primary-container: color-mix(in srgb, var(--accent-seed) 38%, #17201a);
+  --hover: color-mix(in srgb, var(--accent-seed) 15%, transparent);
+  --ring: color-mix(in srgb, var(--accent-seed) 44%, transparent);
   --danger: #b91c1c;
   --line: rgba(29, 29, 29, 0.07);
   --radius: 18px;
@@ -40,12 +43,14 @@
   --muted: #aaaab0;
   --card: #19191b;
   --surface: #242426;
-  --high: #2e2e30;
-  --field: #343437;
-  --primary: #fff;
-  --on-primary: #18181b;
-  --hover: rgba(255, 255, 255, 0.08);
-  --ring: rgba(255, 255, 255, 0.28);
+  --high: color-mix(in srgb, var(--accent-seed) 18%, #2e2e30);
+  --field: color-mix(in srgb, var(--accent-seed) 13%, #343437);
+  --primary: color-mix(in srgb, var(--accent-seed) 70%, #f4f0ea);
+  --on-primary: #17211b;
+  --primary-container: color-mix(in srgb, var(--accent-seed) 28%, #202421);
+  --on-primary-container: color-mix(in srgb, var(--accent-seed) 70%, #fff);
+  --hover: color-mix(in srgb, var(--accent-seed) 17%, transparent);
+  --ring: color-mix(in srgb, var(--accent-seed) 48%, transparent);
   --danger: #ff9a9a;
   --line: rgba(237, 237, 239, 0.08);
   background: #111113;
@@ -205,7 +210,7 @@ strong {
   position: relative;
   overflow: clip;
   display: flex;
-  gap: 12px;
+  gap: 0;
   flex: 1;
   min-height: 0;
 }
@@ -220,7 +225,7 @@ strong {
     width var(--motion-panel) var(--motion-ease),
     margin-left var(--motion-panel) var(--motion-ease),
     opacity 220ms ease;
-  width: 300px;
+  width: var(--contacts-width, 300px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -265,8 +270,8 @@ strong {
   padding: 8px 5px;
 }
 .tabs .active {
-  background: var(--card);
-  color: var(--text);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
   font-weight: 600;
 }
 .empty {
@@ -319,8 +324,73 @@ strong {
 }
 .chat {
   flex: 1;
+  min-width: 320px;
   display: flex;
   flex-direction: column;
+}
+.panel-resizer {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 12px;
+  width: 12px;
+  min-width: 12px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.panel-resizer::before {
+  content: "";
+  position: absolute;
+  inset: 12px 5px;
+  border-radius: 999px;
+  background: var(--primary);
+  opacity: 0;
+  transform: scaleY(0.75);
+  transition:
+    opacity 150ms ease,
+    transform 180ms var(--motion-ease);
+}
+.panel-resizer:hover::before,
+.panel-resizer:focus-visible::before,
+.layout.is-resizing .panel-resizer::before {
+  opacity: 0.72;
+  transform: scaleY(1);
+}
+.resize-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 40px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line));
+  border-radius: 999px;
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  box-shadow: 0 4px 14px #00000012;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.86);
+  transition:
+    opacity 150ms ease,
+    transform 180ms var(--motion-ease);
+}
+.panel-resizer:hover .resize-handle,
+.panel-resizer:focus-visible .resize-handle,
+.layout.is-resizing .resize-handle {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.layout.is-resizing,
+.layout.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+.layout.is-resizing .contacts {
+  transition: none;
+}
+.layout.has-panel .panel-resizer {
+  pointer-events: none;
 }
 .chat-head {
   height: 84px;
@@ -387,7 +457,7 @@ strong {
     padding: 0 12px;
   }
   .contacts {
-    width: 260px;
+    width: var(--contacts-width, 260px);
   }
   .chat-head {
     padding: 0 18px;
@@ -486,7 +556,8 @@ strong {
   flex-shrink: 0;
 }
 .contact-row.selected {
-  background: var(--card);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
 }
 .contact-text {
   flex: 1;
@@ -1144,6 +1215,12 @@ td code {
     margin-left: 0;
     opacity: 1;
     pointer-events: auto;
+  }
+  .panel-resizer {
+    display: none;
+  }
+  .chat {
+    min-width: 0;
   }
   .layout.has-panel .side-panel {
     width: 100%;
