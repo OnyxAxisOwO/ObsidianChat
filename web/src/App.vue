@@ -492,7 +492,11 @@ onMounted(boot);
       <main
         v-else
         class="layout"
-        :class="{ 'has-room': mobileChat, 'has-panel': !!panel }"
+        :class="{
+          'has-room': mobileChat,
+          'has-panel': !!panel,
+          'has-settings': renderedPanel === 'account',
+        }"
       >
         <aside class="contacts panel" :inert="mobile && !!panel">
           <div class="section-head">
